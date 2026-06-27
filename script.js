@@ -296,8 +296,8 @@ function makeResizable(el, handle, photo, onChange) {
 
     function move(ev) {
       const dx = ev.clientX - startX, dy = ev.clientY - startY;
-      photo.w = Math.max(120, origW + dx);
-      photo.h = Math.max(150, origH + dy);
+      photo.w = Math.max(100, origW + dx);
+      photo.h = Math.max(100, origH + dy);
       el.style.width = photo.w + 'px';
       el.style.height = photo.h + 'px';
     }
@@ -407,9 +407,26 @@ photoInput.addEventListener('change', async (e) => {
       reader.readAsDataURL(file);
     });
 
+    // ── detect natural aspect ratio ────────────────────────────
+    const { natW, natH } = await new Promise((res) => {
+      const img = new Image();
+      img.onload = () => res({ natW: img.naturalWidth, natH: img.naturalHeight });
+      img.onerror = () => res({ natW: 1, natH: 1 }); // fallback to square
+      img.src = dataUrl;
+    });
+
+    const MAX_SIDE = 220;
+    let w, h;
+    if (natW >= natH) {
+      w = MAX_SIDE;
+      h = Math.round(MAX_SIDE * (natH / natW));
+    } else {
+      h = MAX_SIDE;
+      w = Math.round(MAX_SIDE * (natW / natH));
+    }
+
     // ── pick a placement position ──────────────────────────────
     let x, y;
-    const w = 220, h = 220;
 
     if (existingSnapshot.length > 0) {
       // Pick a different random anchor for each new image
