@@ -15,9 +15,9 @@
 |---|---|
 | 🕐 **Clock** | Large, always-visible time display with AM/PM and date |
 | 🔍 **Google Search** | Spotlight-style search bar with autocomplete — focus with `Ctrl+G` |
-| 🖼️ **Photo Board** | Freely drag, resize, and layer goal/inspiration images on a freeform canvas |
-| ✅ **Tasks** | Lightweight persistent to-do list on the right panel |
-| 🔖 **Bookmarks** | Slide-out bookmark drawer + pin up to 6 shortcuts to the left toolbar |
+| 🖼️ **Photo Board** | Freely drag, resize, and layer goal/inspiration images, or drag and drop image files directly from your computer to pin them |
+| ✅ **Tasks** | Lightweight persistent to-do list on the right panel with drag-and-drop reordering |
+| 🔖 **Bookmarks** | Slide-out bookmark drawer + pin up to 6 shortcuts to the left toolbar with drag-and-drop reordering |
 | 🌙 **Theme** | Dark / light mode toggle, persisted across tabs |
 | 👋 **Welcome Screen** | First-install overlay that walks new users through all features |
 

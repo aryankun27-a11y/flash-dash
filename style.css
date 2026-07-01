@@ -1273,3 +1273,97 @@ body.focus-mode .stage {
     border-radius: 20px;
   }
 }
+
+/* ══════════════════════════════════════════════════════════════
+   Drag and Drop Overlay & Reordering Cues
+   ══════════════════════════════════════════════════════════════ */
+
+.drag-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 100000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.45);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.3s ease;
+}
+
+.drag-overlay.active {
+  opacity: 1;
+}
+
+.drag-overlay-card {
+  background: rgba(255, 255, 255, 0.08);
+  border: 2px dashed rgba(255, 255, 255, 0.25);
+  border-radius: var(--radius);
+  padding: 40px;
+  max-width: 400px;
+  width: calc(100% - 48px);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  text-align: center;
+  transform: scale(0.95);
+  transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.4);
+}
+
+.drag-overlay.active .drag-overlay-card {
+  transform: scale(1);
+}
+
+.drag-icon {
+  font-size: 48px;
+  animation: drag-overlay-float 3s ease-in-out infinite;
+  display: inline-block;
+}
+
+.drag-title {
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 22px;
+  font-weight: 700;
+  color: #ffffff;
+}
+
+.drag-desc {
+  font-size: 13.5px;
+  color: rgba(255, 255, 255, 0.7);
+}
+
+@keyframes drag-overlay-float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-8px); }
+}
+
+[data-theme="light"] .drag-overlay {
+  background: rgba(255, 255, 255, 0.45);
+}
+
+[data-theme="light"] .drag-overlay-card {
+  background: rgba(0, 0, 0, 0.05);
+  border-color: rgba(0, 0, 0, 0.22);
+  color: #000000;
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.1);
+}
+
+[data-theme="light"] .drag-title {
+  color: #0a0a0a;
+}
+
+[data-theme="light"] .drag-desc {
+  color: rgba(10, 10, 10, 0.7);
+}
+
+/* Dragging visual cues for tasks and shortcuts */
+.task-item.dragging,
+.pinned-shortcut.dragging {
+  opacity: 0.4;
+  border: 1px dashed var(--border) !important;
+  background: var(--glass-strong) !important;
+}

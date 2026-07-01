@@ -1,3 +1,18 @@
+// ---------- drag-and-drop position helper ----------
+function getDragAfterElement(container, y, selector) {
+  const draggableElements = [...container.querySelectorAll(`${selector}:not(.dragging)`)];
+
+  return draggableElements.reduce((closest, child) => {
+    const box = child.getBoundingClientRect();
+    const offset = y - box.top - box.height / 2;
+    if (offset < 0 && offset > closest.offset) {
+      return { offset: offset, element: child };
+    } else {
+      return closest;
+    }
+  }, { offset: Number.NEGATIVE_INFINITY }).element;
+}
+
 // ---------- storage helper (chrome.storage with localStorage fallback) ----------
 const store = {
   async get(key, fallback) {
@@ -166,6 +181,27 @@ function renderTasks(tasks) {
   tasks.forEach((task, idx) => {
     const li = document.createElement('li');
     li.className = 'task-item';
+    li.setAttribute('draggable', 'true');
+    li.dataset.index = idx;
+
+    li.addEventListener('dragstart', (e) => {
+      li.classList.add('dragging');
+      e.dataTransfer.setData('text/plain', idx);
+      e.dataTransfer.effectAllowed = 'move';
+    });
+
+    li.addEventListener('dragend', async () => {
+      li.classList.remove('dragging');
+      const items = [...taskList.querySelectorAll('.task-item')];
+      const current = await store.get('tasks', []);
+      const reordered = items.map(item => {
+        const index = parseInt(item.dataset.index);
+        return current[index];
+      });
+      await store.set('tasks', reordered);
+      updateCount(reordered);
+      renderTasks(reordered);
+    });
 
     const check = document.createElement('div');
     check.className = 'task-check' + (task.done ? ' done' : '');
@@ -198,6 +234,18 @@ function renderTasks(tasks) {
     taskList.appendChild(li);
   });
 }
+
+taskList.addEventListener('dragover', (e) => {
+  e.preventDefault();
+  const draggingEl = taskList.querySelector('.task-item.dragging');
+  if (!draggingEl) return;
+  const afterElement = getDragAfterElement(taskList, e.clientY, '.task-item');
+  if (afterElement == null) {
+    taskList.appendChild(draggingEl);
+  } else {
+    taskList.insertBefore(draggingEl, afterElement);
+  }
+});
 
 function updateCount(tasks) {
   const left = tasks.filter(t => !t.done).length;
@@ -296,8 +344,8 @@ function makeResizable(el, handle, photo, onChange) {
 
     function move(ev) {
       const dx = ev.clientX - startX, dy = ev.clientY - startY;
-      photo.w = Math.max(100, origW + dx);
-      photo.h = Math.max(100, origH + dy);
+      photo.w = Math.max(50, origW + dx);
+      photo.h = Math.max(50, origH + dy);
       el.style.width = photo.w + 'px';
       el.style.height = photo.h + 'px';
     }
@@ -391,16 +439,13 @@ clearPhotosBtn.addEventListener('click', async () => {
   renderBoard();
 });
 
-photoInput.addEventListener('change', async (e) => {
-  const files = [...e.target.files];
+async function addPhotos(files, dropCoords = null) {
   const photos = await store.get('photos', []);
-
-  // Build a pool of existing photos to use as anchors.
-  // We'll shuffle it so each new file gets a different anchor when possible.
   const existingSnapshot = [...photos];
 
   for (let i = 0; i < files.length; i++) {
     const file = files[i];
+    if (!file.type.startsWith('image/')) continue;
     const dataUrl = await new Promise((res) => {
       const reader = new FileReader();
       reader.onload = () => res(reader.result);
@@ -415,7 +460,7 @@ photoInput.addEventListener('change', async (e) => {
       img.src = dataUrl;
     });
 
-    const MAX_SIDE = 220;
+    const MAX_SIDE = 150;
     let w, h;
     if (natW >= natH) {
       w = MAX_SIDE;
@@ -428,7 +473,12 @@ photoInput.addEventListener('change', async (e) => {
     // ── pick a placement position ──────────────────────────────
     let x, y;
 
-    if (existingSnapshot.length > 0) {
+    if (dropCoords) {
+      // Place exactly centered on the cursor, offset multiple files slightly
+      const offset = i * 15;
+      x = dropCoords.x - w / 2 + offset;
+      y = dropCoords.y - h / 2 + offset;
+    } else if (existingSnapshot.length > 0) {
       // Pick a different random anchor for each new image
       const anchor = existingSnapshot[Math.floor(Math.random() * existingSnapshot.length)];
 
@@ -460,14 +510,51 @@ photoInput.addEventListener('change', async (e) => {
       z: _photoZCounter
     };
     photos.push(photo);
-    // Also add to the snapshot so subsequent files in the same batch
-    // can anchor to photos added in this very upload
     existingSnapshot.push(photo);
   }
 
   await store.set('photos', photos);
-  photoInput.value = '';
   renderBoard();
+}
+
+photoInput.addEventListener('change', async (e) => {
+  const files = [...e.target.files];
+  await addPhotos(files);
+  photoInput.value = '';
+});
+
+// ---------- Document Drag & Drop File Handlers ----------
+let dragCounter = 0;
+document.addEventListener('dragenter', (e) => {
+  e.preventDefault();
+  dragCounter++;
+  if (e.dataTransfer.types.includes('Files')) {
+    document.getElementById('dragOverlay').classList.add('active');
+  }
+});
+
+document.addEventListener('dragover', (e) => {
+  e.preventDefault();
+});
+
+document.addEventListener('dragleave', (e) => {
+  e.preventDefault();
+  dragCounter--;
+  if (dragCounter === 0) {
+    document.getElementById('dragOverlay').classList.remove('active');
+  }
+});
+
+document.addEventListener('drop', async (e) => {
+  e.preventDefault();
+  dragCounter = 0;
+  document.getElementById('dragOverlay').classList.remove('active');
+
+  const files = [...e.dataTransfer.files];
+  if (files.length > 0) {
+    const dropCoords = { x: e.clientX, y: e.clientY };
+    await addPhotos(files, dropCoords);
+  }
 });
 
 // ---------- Pinned App Shortcuts ----------
@@ -679,12 +766,32 @@ ctxOpenLink.addEventListener('click', () => {
 function renderPinnedToolbar(pinned) {
   pinnedShortcutsGroup.innerHTML = '';
 
-  pinned.forEach(p => {
+  pinned.forEach((p, idx) => {
     const btn = document.createElement('button');
     btn.className = 'pinned-shortcut task-btn';
     btn.setAttribute('data-title', p.title);
     btn.title = '';  // suppress native tooltip; we use CSS ::after
     btn.setAttribute('aria-label', p.title);
+    btn.setAttribute('draggable', 'true');
+    btn.dataset.index = idx;
+
+    btn.addEventListener('dragstart', (e) => {
+      btn.classList.add('dragging');
+      e.dataTransfer.setData('text/plain', idx);
+      e.dataTransfer.effectAllowed = 'move';
+    });
+
+    btn.addEventListener('dragend', async () => {
+      btn.classList.remove('dragging');
+      const items = [...pinnedShortcutsGroup.querySelectorAll('.pinned-shortcut')];
+      const current = await store.get('pinnedShortcuts', []);
+      const reordered = items.map(item => {
+        const index = parseInt(item.dataset.index);
+        return current[index];
+      });
+      await store.set('pinnedShortcuts', reordered);
+      renderPinnedToolbar(reordered);
+    });
 
     const img = document.createElement('img');
     img.src = faviconUrl(p.url);
@@ -716,6 +823,18 @@ function renderPinnedToolbar(pinned) {
     pinnedShortcutsGroup.appendChild(btn);
   });
 }
+
+pinnedShortcutsGroup.addEventListener('dragover', (e) => {
+  e.preventDefault();
+  const draggingEl = pinnedShortcutsGroup.querySelector('.pinned-shortcut.dragging');
+  if (!draggingEl) return;
+  const afterElement = getDragAfterElement(pinnedShortcutsGroup, e.clientY, '.pinned-shortcut');
+  if (afterElement == null) {
+    pinnedShortcutsGroup.appendChild(draggingEl);
+  } else {
+    pinnedShortcutsGroup.insertBefore(draggingEl, afterElement);
+  }
+});
 
 // Init pinned shortcuts on load
 (async () => {
