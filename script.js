@@ -1308,7 +1308,7 @@ if (timerDoneBtn) {
 }
 
 // Global Spacebar and R Key listener (when not inside inputs)
-document.addEventListener('keydown', (e) => {
+document.addEventListener('keydown', async (e) => {
   // Only capture keypresses in Focus Mode
   if (!document.body.classList.contains('focus-mode')) return;
   
