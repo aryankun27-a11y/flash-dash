@@ -33,6 +33,18 @@ const store = {
       });
     }
     try { localStorage.setItem(key, JSON.stringify(value)); } catch (e) { }
+  },
+  async setMultiple(obj) {
+    if (window.chrome && chrome.storage && chrome.storage.local) {
+      return new Promise(res => {
+        chrome.storage.local.set(obj, res);
+      });
+    }
+    try {
+      for (const [k, v] of Object.entries(obj)) {
+        localStorage.setItem(k, JSON.stringify(v));
+      }
+    } catch (e) { }
   }
 };
 
@@ -327,6 +339,7 @@ function renderTasks(tasks) {
 
     li.addEventListener('dragend', async () => {
       li.classList.remove('dragging');
+      li.setAttribute('draggable', 'false');
       const items = [...taskList.querySelectorAll('.task-item')];
       const current = await store.get('tasks', []);
       const reordered = items.map(item => {
@@ -532,6 +545,17 @@ const photoInput = document.getElementById('photoInput');
 const addPhotoBtn = document.getElementById('addPhotoBtn');
 const clearPhotosBtn = document.getElementById('clearPhotosBtn');
 
+// Updates the disabled state of the Clear Whiteboard Photos button
+async function updateClearPhotosBtnState() {
+  if (!clearPhotosBtn) return;
+  const photos = await store.get('photos', []);
+  if (photos.length === 0) {
+    clearPhotosBtn.setAttribute('disabled', 'true');
+  } else {
+    clearPhotosBtn.removeAttribute('disabled');
+  }
+}
+
 // Tracks the highest z-index used so far so we can always bring one more to front
 let _photoZCounter = 10;
 let loadedPhotos = [];
@@ -735,6 +759,7 @@ async function renderPhotoEl(photo) {
       photoObjectUrls.delete(photo.id);
     }
     wrap.remove();
+    updateClearPhotosBtnState();
   });
   wrap.appendChild(del);
 
@@ -773,6 +798,7 @@ async function renderPhotoEl(photo) {
 async function renderBoard() {
   loadedPhotos = await store.get('photos', []);
   board.innerHTML = '';
+  updateClearPhotosBtnState();
   loadedPhotos.forEach(renderPhotoEl);
 }
 
@@ -958,6 +984,9 @@ async function toggleFocusMode(e) {
   
   if (!isFocus) {
     document.body.classList.remove('timer-flash-active');
+    if (timerState === 'finished') {
+      await resetTimer();
+    }
   }
 }
 
@@ -1114,8 +1143,10 @@ async function startTimer(durationMs) {
   requestNotificationPermission();
   timerState = 'running';
   timerEndTimestamp = Date.now() + durationMs;
-  await store.set('focusTimerState', 'running');
-  await store.set('focusTimerEndTimestamp', timerEndTimestamp);
+  await store.setMultiple({
+    focusTimerState: 'running',
+    focusTimerEndTimestamp: timerEndTimestamp
+  });
   
   document.body.classList.add('timer-running');
   if (timerView) timerView.className = 'timer-view running';
@@ -1163,8 +1194,10 @@ async function updateTimerLoop() {
 async function pauseTimer() {
   if (timerInterval) clearInterval(timerInterval);
   timerState = 'paused';
-  await store.set('focusTimerState', 'paused');
-  await store.set('focusTimerRemaining', timerRemainingMs);
+  await store.setMultiple({
+    focusTimerState: 'paused',
+    focusTimerRemaining: timerRemainingMs
+  });
   
   document.body.classList.remove('timer-running');
   if (timerView) timerView.className = 'timer-view paused';
@@ -1182,8 +1215,10 @@ async function resetTimer() {
   timerRemainingMs = durationMin * 60 * 1000;
   updateTimerDisplay(timerRemainingMs);
   
-  await store.set('focusTimerState', 'idle');
-  await store.set('focusTimerRemaining', timerRemainingMs);
+  await store.setMultiple({
+    focusTimerState: 'idle',
+    focusTimerRemaining: timerRemainingMs
+  });
   
   if (timerView) timerView.className = 'timer-view paused';
   
@@ -1269,12 +1304,14 @@ async function saveTimerEditMode() {
   }
   val = Math.min(999, val); // clamp to max 999 mins
   
-  await store.set('focusTimerDuration', val);
   timerRemainingMs = val * 60 * 1000;
   updateTimerDisplay(timerRemainingMs);
   
-  await store.set('focusTimerState', 'idle');
-  await store.set('focusTimerRemaining', timerRemainingMs);
+  await store.setMultiple({
+    focusTimerDuration: val,
+    focusTimerState: 'idle',
+    focusTimerRemaining: timerRemainingMs
+  });
   
   timerState = 'idle';
   timerView.className = 'timer-view paused';
@@ -1287,7 +1324,10 @@ if (timerInput) {
       await saveTimerEditMode();
     } else if (e.key === 'Escape') {
       e.preventDefault();
+      // Revert input value to the current timer duration in minutes before blurring
+      timerInput.value = Math.round(timerRemainingMs / (60 * 1000));
       timerView.classList.remove('editing');
+      timerInput.blur();
     }
   });
   
@@ -1647,10 +1687,12 @@ clearBgBtn.addEventListener('click', async () => {
   const confirmed = confirm('Remove the screen background?');
   if (!confirmed) return;
 
-  await store.set('bgImage', null);
+  await store.setMultiple({
+    bgImage: null,
+    bgDim: 0,
+    bgBlur: 0
+  });
   await largeStore.delete('bgImage');
-  await store.set('bgDim', 0);
-  await store.set('bgBlur', 0);
 
   applyBgImage(null);
   
@@ -1716,7 +1758,16 @@ async function migrateLegacyData() {
       }
     }
     
-    // 2. Migrate coordinate pixels to proportional percentages
+    // 2. Migrate back from percentages to absolute pixels if needed (MUST run before step 3 to resolve size)
+    if (photo.wPercent !== undefined && photo.w === undefined) {
+      photo.w = Math.round(photo.wPercent * window.innerWidth);
+      photo.h = Math.round(photo.hPercent * window.innerHeight);
+      delete photo.wPercent;
+      delete photo.hPercent;
+      needsSave = true;
+    }
+    
+    // 3. Migrate coordinate pixels to proportional percentages
     if (photo.xPercent === undefined) {
       const w = photo.w || 150;
       const h = photo.h || 150;
@@ -1730,15 +1781,6 @@ async function migrateLegacyData() {
       
       delete photo.x;
       delete photo.y;
-      needsSave = true;
-    }
-    
-    // 3. Migrate back from percentages to absolute pixels if needed
-    if (photo.wPercent !== undefined && photo.w === undefined) {
-      photo.w = Math.round(photo.wPercent * window.innerWidth);
-      photo.h = Math.round(photo.hPercent * window.innerHeight);
-      delete photo.wPercent;
-      delete photo.hPercent;
       needsSave = true;
     }
   }
