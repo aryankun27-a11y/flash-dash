@@ -23,6 +23,11 @@
   box-sizing: border-box;
 }
 
+::selection {
+  background: var(--border);
+  color: var(--text);
+}
+
 html,
 body {
   margin: 0;
@@ -48,24 +53,36 @@ body {
 .board {
   position: fixed;
   inset: 0;
-  z-index: 1;
+  z-index: 2;
+  pointer-events: none;
 }
 
 .photo {
   position: absolute;
-  padding: 0;
-  background: transparent;
-  border: none;
-  border-radius: 0;
-  box-shadow: none;
+  border-radius: 8px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.22);
+  border: 1px solid rgba(255, 255, 255, 0.08);
   cursor: grab;
   touch-action: none;
-  transition: box-shadow .2s ease;
+  box-sizing: border-box;
+  display: flex;
   z-index: 2;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+  pointer-events: auto;
+  overflow: visible;
+  background: transparent;
+  padding: 0;
 }
 
 .photo:active {
   cursor: grabbing;
+  transform: scale(1.02);
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.35);
+}
+
+[data-theme="light"] .photo {
+  border-color: rgba(0, 0, 0, 0.08);
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.12);
 }
 
 /* Brief ring flash when a photo is brought to the front */
@@ -95,48 +112,21 @@ body {
   height: 100%;
   object-fit: cover;
   pointer-events: none;
-  border-radius: 0;
+  border-radius: 8px;
   background: var(--glass-strong);
-}
-
-
-.photo .resize {
-  position: absolute;
-  right: 4px;
-  bottom: 4px;
-  width: 14px;
-  height: 14px;
-  cursor: nwse-resize;
-  opacity: 0;
-  transition: opacity .15s;
-}
-
-.photo:hover .resize {
-  opacity: 0.5;
-}
-
-.photo .resize::after {
-  content: '';
-  position: absolute;
-  right: 3px;
-  bottom: 3px;
-  width: 6px;
-  height: 6px;
-  border-right: 1.5px solid var(--text);
-  border-bottom: 1.5px solid var(--text);
 }
 
 .photo .del {
   position: absolute;
-  top: -9px;
-  right: -9px;
-  width: 22px;
-  height: 22px;
+  top: -8px;
+  right: -8px;
+  width: 20px;
+  height: 20px;
   border-radius: 50%;
   background: var(--bg);
   border: 1px solid var(--border);
   color: var(--text-dim);
-  font-size: 13px;
+  font-size: 12px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -201,207 +191,6 @@ body {
   flex-shrink: 0;
 }
 
-/* Pinned shortcut favicon buttons */
-.pinned-shortcut {
-  position: relative;
-  width: 36px;
-  height: 36px;
-  border-radius: 12px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: transparent;
-  border: 1px solid transparent;
-  cursor: pointer;
-  transition: transform .15s ease, background .15s ease, border-color .15s ease;
-  text-decoration: none;
-  overflow: visible;
-}
-
-.pinned-shortcut:hover {
-  background: var(--glass-strong);
-  border-color: var(--border);
-  transform: scale(1.1);
-}
-
-.pinned-shortcut img {
-  width: 20px;
-  height: 20px;
-  border-radius: 5px;
-  display: block;
-}
-
-.pinned-shortcut .shortcut-fallback {
-  width: 20px;
-  height: 20px;
-  border-radius: 5px;
-  background: var(--glass-strong);
-  border: 1px solid var(--border);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 9px;
-  font-weight: 700;
-  color: var(--text-dim);
-  text-transform: uppercase;
-}
-
-/* Tooltip on hover */
-.pinned-shortcut::after {
-  content: attr(data-title);
-  position: absolute;
-  left: calc(100% + 10px);
-  top: 50%;
-  transform: translateY(-50%);
-  background: rgba(0,0,0,0.75);
-  color: #fff;
-  font-size: 11px;
-  font-weight: 500;
-  white-space: nowrap;
-  padding: 4px 9px;
-  border-radius: 7px;
-  pointer-events: none;
-  opacity: 0;
-  transition: opacity .15s ease;
-  backdrop-filter: blur(6px);
-  z-index: 99;
-}
-
-[data-theme="light"] .pinned-shortcut::after {
-  background: rgba(30,30,30,0.82);
-}
-
-.pinned-shortcut:hover::after {
-  opacity: 1;
-}
-
-/* Pin picker panel (reuses .bookmarks-drawer) */
-.pin-picker-hint {
-  font-size: 12px;
-  color: var(--text-dim);
-  margin: 0 0 12px;
-  line-height: 1.5;
-}
-
-/* Pin item row inside picker */
-.pin-picker-item {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 8px 10px;
-  border-radius: 10px;
-  background: var(--glass);
-  border: 1px solid transparent;
-  color: var(--text);
-  font-size: 13px;
-  cursor: pointer;
-  transition: background .15s, border-color .15s, transform .15s;
-  user-select: none;
-}
-
-.pin-picker-item:hover {
-  background: var(--glass-strong);
-  border-color: var(--border);
-  transform: translateX(2px);
-}
-
-.pin-picker-item.pinned {
-  border-color: rgba(255,255,255,0.25);
-  background: rgba(255,255,255,0.08);
-}
-
-[data-theme="light"] .pin-picker-item.pinned {
-  border-color: rgba(0,0,0,0.18);
-  background: rgba(0,0,0,0.06);
-}
-
-.pin-picker-item .pin-check {
-  width: 16px;
-  height: 16px;
-  border-radius: 50%;
-  border: 1.5px solid var(--text-dim);
-  flex-shrink: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transition: all .15s;
-  margin-left: auto;
-}
-
-.pin-picker-item.pinned .pin-check {
-  background: var(--text);
-  border-color: var(--text);
-}
-
-.pin-picker-item.pinned .pin-check::after {
-  content: '✓';
-  font-size: 9px;
-  color: var(--bg);
-}
-
-/* ---------- Pinned shortcut right-click context menu ---------- */
-.shortcut-context-menu {
-  position: fixed;
-  z-index: 9999;
-  min-width: 140px;
-  background: var(--glass-strong);
-  border: 1px solid var(--border);
-  border-radius: 12px;
-  padding: 6px;
-  backdrop-filter: blur(24px);
-  -webkit-backdrop-filter: blur(24px);
-  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.4);
-  animation: ctx-in .12s ease;
-  pointer-events: auto;
-}
-
-[data-theme="light"] .shortcut-context-menu {
-  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.12);
-}
-
-@keyframes ctx-in {
-  from { opacity: 0; transform: scale(0.92); }
-  to   { opacity: 1; transform: scale(1); }
-}
-
-.shortcut-context-menu button {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  width: 100%;
-  padding: 8px 10px;
-  background: transparent;
-  border: none;
-  border-radius: 8px;
-  color: var(--text);
-  font-family: inherit;
-  font-size: 13px;
-  font-weight: 500;
-  cursor: pointer;
-  text-align: left;
-  transition: background .12s ease, color .12s ease;
-}
-
-.shortcut-context-menu button:hover {
-  background: var(--glass-strong);
-}
-
-.shortcut-context-menu button.ctx-danger:hover {
-  background: rgba(255, 80, 80, 0.12);
-  color: #ff6b6b;
-}
-
-[data-theme="light"] .shortcut-context-menu button.ctx-danger:hover {
-  background: rgba(200, 40, 40, 0.08);
-  color: #e03131;
-}
-
-.shortcut-context-menu .ctx-icon {
-  width: 15px;
-  height: 15px;
-  flex-shrink: 0;
-  opacity: 0.7;
-}
 
 .task-btn {
   width: 36px;
@@ -575,13 +364,11 @@ body {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  z-index: 2;
+  z-index: 3;
   pointer-events: none;
-}
-
-/* Allow the search bar wrapper to receive events */
-.search-bar-wrapper {
-  pointer-events: auto;
+  transform: translateY(4vh);
+  user-select: none;
+  -webkit-user-select: none;
 }
 
 .clock {
@@ -595,6 +382,8 @@ body {
   align-items: flex-end;
   gap: 10px;
   color: var(--text);
+  user-select: none;
+  -webkit-user-select: none;
 }
 
 .ampm {
@@ -603,6 +392,8 @@ body {
   color: var(--text-dim);
   margin-bottom: 0.22em;
   letter-spacing: 1px;
+  user-select: none;
+  -webkit-user-select: none;
 }
 
 .date {
@@ -611,6 +402,8 @@ body {
   color: var(--text-dim);
   letter-spacing: 0.5px;
   font-weight: 500;
+  user-select: none;
+  -webkit-user-select: none;
 }
 
 /* ---------- right panel ---------- */
@@ -772,272 +565,9 @@ body {
   }
 }
 
-/* ---------- Feature 1: Google Search Bar (below clock) ---------- */
-
-/* Wrapper: sits below the date in the stage column */
-.search-bar-wrapper {
-  position: relative;
-  margin-top: 28px;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  width: 460px;
-  max-width: 90vw;
-}
-
-.search-bar-container {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  width: 100%;
-  background: var(--glass);
-  border: 1px solid var(--border);
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
-  border-radius: 28px;
-  padding: 11px 20px;
-  z-index: 10;
-  opacity: 0.55;
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.18);
-  transition:
-    opacity 0.35s ease,
-    border-color 0.35s ease,
-    box-shadow 0.35s ease,
-    width 0.4s cubic-bezier(0.34, 1.56, 0.64, 1),
-    background 0.35s ease;
-}
-
-[data-theme="light"] .search-bar-container {
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.06);
-}
-
-/* Focused / active state — spotlight effect */
-.search-bar-wrapper.active .search-bar-container {
-  opacity: 1;
-  border-color: rgba(255, 255, 255, 0.28);
-  box-shadow:
-    0 0 0 1px rgba(255, 255, 255, 0.1),
-    0 16px 56px rgba(0, 0, 0, 0.35),
-    0 0 40px rgba(255, 255, 255, 0.04);
-  background: var(--glass-strong);
-}
-
-[data-theme="light"] .search-bar-wrapper.active .search-bar-container {
-  border-color: rgba(0, 0, 0, 0.22);
-  box-shadow:
-    0 0 0 1px rgba(0, 0, 0, 0.08),
-    0 16px 56px rgba(0, 0, 0, 0.12);
-}
-
-/* Hover while not focused */
-.search-bar-container:hover {
-  opacity: 0.82;
-}
-
-.search-bar-icon {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: var(--text-dim);
-  flex-shrink: 0;
-  transition: color 0.3s;
-}
-
-.search-bar-wrapper.active .search-bar-icon {
-  color: var(--text);
-}
-
-#searchBarInput {
-  width: 100%;
-  background: transparent;
-  border: none;
-  outline: none;
-  color: var(--text);
-  font-family: inherit;
-  font-size: 14px;
-  font-weight: 400;
-  letter-spacing: 0.01em;
-}
-
-#searchBarInput::placeholder {
-  color: var(--text-dim);
-}
-
-/* Ctrl+G keyboard hint badge */
-.search-shortcut-hint {
-  flex-shrink: 0;
-  font-family: inherit;
-  font-size: 10px;
-  font-weight: 600;
-  letter-spacing: 0.03em;
-  color: var(--text-dim);
-  background: var(--glass);
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  padding: 2px 6px;
-  opacity: 0.7;
-  transition: opacity 0.3s;
-  white-space: nowrap;
-  user-select: none;
-  pointer-events: none;
-}
-
-.search-bar-wrapper.active .search-shortcut-hint {
-  opacity: 0;
-  pointer-events: none;
-}
-
-/* ---------- Suggestions dropdown ---------- */
-.search-suggestions {
-  position: absolute;
-  top: calc(100% + 8px);
-  left: 0;
-  right: 0;
-  background: var(--glass-strong);
-  border: 1px solid var(--border);
-  backdrop-filter: blur(24px);
-  -webkit-backdrop-filter: blur(24px);
-  border-radius: 18px;
-  overflow: hidden;
-  z-index: 20;
-  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.35);
-  display: none;
-  flex-direction: column;
-}
-
-[data-theme="light"] .search-suggestions {
-  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.1);
-}
-
-.search-suggestions.visible {
-  display: flex;
-  animation: suggestions-in 0.18s cubic-bezier(0.34, 1.56, 0.64, 1);
-}
-
-@keyframes suggestions-in {
-  from { opacity: 0; transform: translateY(-6px) scale(0.98); }
-  to   { opacity: 1; transform: translateY(0) scale(1); }
-}
-
-.suggestion-section-label {
-  font-size: 10px;
-  font-weight: 600;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  color: var(--text-dim);
-  padding: 10px 18px 4px;
-  user-select: none;
-}
-
-.suggestion-item {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 10px 18px;
-  cursor: pointer;
-  transition: background 0.12s ease;
-  border-radius: 0;
-  color: var(--text);
-  font-size: 13.5px;
-  font-weight: 400;
-  text-decoration: none;
-  outline: none;
-}
-
-.suggestion-item:first-of-type {
-  border-radius: 18px 18px 0 0;
-}
-
-.suggestion-item:last-child {
-  border-radius: 0 0 18px 18px;
-}
-
-.suggestion-item:only-child {
-  border-radius: 18px;
-}
-
-.suggestion-item:hover,
-.suggestion-item.focused {
-  background: rgba(255,255,255,0.07);
-}
-
-[data-theme="light"] .suggestion-item:hover,
-[data-theme="light"] .suggestion-item.focused {
-  background: rgba(0,0,0,0.05);
-}
-
-.suggestion-icon {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 20px;
-  flex-shrink: 0;
-  color: var(--text-dim);
-  opacity: 0.65;
-}
-
-.suggestion-text {
-  flex: 1;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.suggestion-text mark {
-  background: transparent;
-  color: var(--text);
-  font-weight: 600;
-}
-
-.suggestion-type-badge {
-  font-size: 10px;
-  color: var(--text-dim);
-  background: var(--glass);
-  border: 1px solid var(--border);
-  padding: 2px 7px;
-  border-radius: 5px;
-  flex-shrink: 0;
-  font-weight: 500;
-}
-
-/* × delete button on history items */
-.suggestion-delete-btn {
-  flex-shrink: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 22px;
-  height: 22px;
-  border-radius: 50%;
-  border: none;
-  background: transparent;
-  color: var(--text-dim);
-  cursor: pointer;
-  opacity: 0;
-  transition: opacity 0.15s ease, background 0.15s ease, color 0.15s ease;
-  padding: 0;
-  margin-left: 2px;
-}
-
-.suggestion-item:hover .suggestion-delete-btn {
-  opacity: 1;
-}
-
-.suggestion-delete-btn:hover {
-  background: rgba(255, 80, 80, 0.15);
-  color: #ff6b6b;
-}
-
-[data-theme="light"] .suggestion-delete-btn:hover {
-  background: rgba(200, 40, 40, 0.1);
-  color: #e03131;
-}
-
-
 body.focus-mode .right-panel,
 body.focus-mode .vertical-toolbar,
-body.focus-mode .board,
-body.focus-mode .search-bar-wrapper {
+body.focus-mode .board {
   opacity: 0 !important;
   pointer-events: none !important;
   transition: opacity 0.5s ease;
@@ -1045,233 +575,193 @@ body.focus-mode .search-bar-wrapper {
 body.focus-mode .stage {
   pointer-events: auto; /* keeps clock clickable if needed */
 }
+/* Thin elegant custom scrollbars */
+.task-list,
+.bookmarks-list {
+  max-height: 280px;
+  scrollbar-width: thin;
+  scrollbar-color: var(--border) transparent;
+}
 
+.task-list::-webkit-scrollbar,
+.bookmarks-list::-webkit-scrollbar {
+  width: 4px;
+  display: block !important;
+}
 
-/* ══════════════════════════════════════════════════════════════
-   Welcome Overlay — first-install screen
-══════════════════════════════════════════════════════════════ */
+.task-list::-webkit-scrollbar-track,
+.bookmarks-list::-webkit-scrollbar-track {
+  background: transparent;
+}
 
-#welcomeOverlay {
-  position: fixed;
-  inset: 0;
-  z-index: 99999;
+.task-list::-webkit-scrollbar-thumb,
+.bookmarks-list::-webkit-scrollbar-thumb {
+  background: var(--border);
+  border-radius: 4px;
+}
+
+.task-list::-webkit-scrollbar-thumb:hover,
+.bookmarks-list::-webkit-scrollbar-thumb:hover {
+  background: var(--text-dim);
+}
+
+/* Custom Task Items & Handles */
+.task-drag-handle {
   display: flex;
   align-items: center;
   justify-content: center;
-  background: rgba(0, 0, 0, 0.78);
-  backdrop-filter: blur(28px);
-  -webkit-backdrop-filter: blur(28px);
-  /* hidden by default; JS shows it on first install */
-  opacity: 0;
-  pointer-events: none;
-  transition: opacity 0.35s ease;
+  color: var(--text-dim);
+  cursor: grab;
+  opacity: 0.25;
+  transition: opacity 0.15s ease, color 0.15s ease;
+  flex-shrink: 0;
+  padding: 2px;
 }
 
-#welcomeOverlay.visible {
-  opacity: 1;
+.task-item:hover .task-drag-handle,
+.task-drag-handle:focus-visible {
+  opacity: 0.8;
+  color: var(--text);
+}
+
+.task-drag-handle:active {
+  cursor: grabbing;
+}
+
+.task-check:focus-visible {
+  border-color: var(--text);
+  box-shadow: 0 0 0 2px var(--border);
+}
+
+
+
+/* Ghost Grid Shortcuts */
+.clock,
+.date,
+.ghost-grid {
   pointer-events: auto;
 }
 
-/* Fade-out animation triggered by JS before hiding */
-#welcomeOverlay.dismissing {
+.ghost-grid {
+  margin-top: 24px;
+  display: flex;
+  gap: 14px;
+  justify-content: center;
   opacity: 0;
-  transform: scale(1.02);
-  transition: opacity 0.4s ease, transform 0.4s ease;
+  pointer-events: none;
+  transition: opacity 0.3s cubic-bezier(0.4, 0, 0.2, 1), transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  transform: translateY(8px);
+  z-index: 10;
+  min-height: 60px;
 }
 
-/* Glassmorphic card */
-.welcome-card {
-  background: rgba(255, 255, 255, 0.06);
-  border: 1px solid rgba(255, 255, 255, 0.13);
-  backdrop-filter: blur(32px);
-  -webkit-backdrop-filter: blur(32px);
-  border-radius: 28px;
-  padding: 40px 44px 36px;
-  max-width: 660px;
-  width: calc(100vw - 48px);
-  box-shadow:
-    0 32px 80px rgba(0, 0, 0, 0.55),
-    0 0 0 1px rgba(255, 255, 255, 0.04) inset;
+.clock:hover ~ .ghost-grid,
+.date:hover ~ .ghost-grid,
+.ghost-grid:hover,
+.ghost-grid.visible,
+.ghost-grid:focus-within {
+  opacity: 1;
+  pointer-events: auto;
+  transform: translateY(0);
+}
+
+.shortcut-item {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 0;
-  /* Entrance animation */
-  animation: welcome-card-in 0.45s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
-}
-
-@keyframes welcome-card-in {
-  from { opacity: 0; transform: translateY(20px) scale(0.96); }
-  to   { opacity: 1; transform: translateY(0)    scale(1); }
-}
-
-/* Logo row */
-.welcome-logo {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  margin-bottom: 16px;
-}
-
-.welcome-logo-icon {
-  font-size: 36px;
-  line-height: 1;
-  filter: drop-shadow(0 0 12px rgba(255, 220, 80, 0.5));
-}
-
-.welcome-logo-text {
-  font-family: 'Space Grotesk', sans-serif;
-  font-size: 28px;
-  font-weight: 700;
-  letter-spacing: -0.5px;
-  color: var(--text);
-}
-
-/* Intro paragraph */
-.welcome-intro {
-  font-size: 14.5px;
-  color: var(--text-dim);
-  text-align: center;
-  line-height: 1.65;
-  margin: 0 0 28px;
-  max-width: 480px;
-}
-
-/* Feature grid: 3 cols × 2 rows */
-.feature-grid {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 10px;
-  width: 100%;
-  margin-bottom: 32px;
-}
-
-.feature-card {
-  background: rgba(255, 255, 255, 0.04);
-  border: 1px solid rgba(255, 255, 255, 0.09);
-  border-radius: 16px;
-  padding: 16px 14px 14px;
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
   gap: 6px;
-  transition: background 0.18s ease, border-color 0.18s ease, transform 0.18s ease;
-  cursor: default;
-}
-
-.feature-card:hover {
-  background: rgba(255, 255, 255, 0.08);
-  border-color: rgba(255, 255, 255, 0.18);
-  transform: translateY(-2px);
-}
-
-.feature-icon {
-  font-size: 22px;
-  line-height: 1;
-  margin-bottom: 2px;
-}
-
-.feature-title {
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--text);
-  letter-spacing: 0.01em;
-}
-
-.feature-desc {
-  font-size: 11.5px;
+  width: 58px;
+  text-decoration: none;
   color: var(--text-dim);
-  line-height: 1.5;
+  font-size: 10px;
+  transition: color 0.15s, transform 0.15s;
+  outline: none;
+  position: relative;
+  pointer-events: auto;
 }
 
-.feature-desc kbd {
-  font-family: inherit;
-  font-size: 10px;
-  font-weight: 600;
-  background: rgba(255, 255, 255, 0.1);
-  border: 1px solid rgba(255, 255, 255, 0.16);
+.shortcut-item:hover,
+.shortcut-item:focus-visible {
+  color: var(--text);
+  transform: scale(1.06);
+}
+
+.shortcut-tile {
+  width: 42px;
+  height: 42px;
+  background: var(--glass);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.15s, border-color 0.15s;
+  position: relative;
+}
+
+.shortcut-item:hover .shortcut-tile,
+.shortcut-item:focus-visible .shortcut-tile {
+  background: var(--glass-strong);
+  border-color: var(--text-dim);
+}
+
+.shortcut-icon {
+  width: 18px;
+  height: 18px;
   border-radius: 4px;
-  padding: 1px 5px;
+  filter: grayscale(1) contrast(1.1);
+  opacity: 0.65;
+  transition: filter 0.15s, opacity 0.15s;
+}
+
+.shortcut-item:hover .shortcut-icon {
+  filter: none;
+  opacity: 1;
+}
+
+.shortcut-fallback {
+  font-size: 13px;
+  font-weight: 700;
+  text-transform: uppercase;
   color: var(--text);
 }
 
-/* Dismiss CTA button */
-.welcome-btn {
-  display: inline-flex;
+.shortcut-label {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  text-align: center;
+  font-weight: 500;
+}
+
+.shortcut-del {
+  position: absolute;
+  top: -5px;
+  right: -5px;
+  width: 15px;
+  height: 15px;
+  border-radius: 50%;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  color: var(--text-dim);
+  font-size: 11px;
+  display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 13px 32px;
-  border-radius: 50px;
-  border: none;
+  justify-content: center;
+  opacity: 0;
+  transition: opacity 0.15s, background 0.15s, color 0.15s;
+  cursor: pointer;
+  z-index: 5;
+}
+
+.shortcut-item:hover .shortcut-del {
+  opacity: 1;
+}
+
+.shortcut-del:hover {
   background: var(--text);
   color: var(--bg);
-  font-family: inherit;
-  font-size: 14px;
-  font-weight: 600;
-  letter-spacing: 0.02em;
-  cursor: pointer;
-  transition: opacity 0.18s ease, transform 0.18s ease, box-shadow 0.18s ease;
-  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.3);
-}
-
-.welcome-btn:hover {
-  opacity: 0.88;
-  transform: translateY(-1px) scale(1.03);
-  box-shadow: 0 12px 36px rgba(0, 0, 0, 0.4);
-}
-
-.welcome-btn:active {
-  transform: scale(0.98);
-}
-
-/* Privacy reassurance note below the CTA */
-.welcome-privacy {
-  margin: 16px 0 0;
-  font-size: 11.5px;
-  color: var(--text-dim);
-  text-align: center;
-  line-height: 1.5;
-  opacity: 0.75;
-  border-top: 1px solid var(--border);
-  padding-top: 14px;
-  width: 100%;
-}
-
-/* Light-theme adjustments for the overlay card */
-[data-theme="light"] #welcomeOverlay {
-  background: rgba(255, 255, 255, 0.72);
-}
-
-[data-theme="light"] .welcome-card {
-  background: rgba(0, 0, 0, 0.04);
-  border-color: rgba(0, 0, 0, 0.1);
-  box-shadow: 0 32px 80px rgba(0, 0, 0, 0.12), 0 0 0 1px rgba(0, 0, 0, 0.03) inset;
-}
-
-[data-theme="light"] .feature-card {
-  background: rgba(0, 0, 0, 0.03);
-  border-color: rgba(0, 0, 0, 0.08);
-}
-
-[data-theme="light"] .feature-card:hover {
-  background: rgba(0, 0, 0, 0.07);
-  border-color: rgba(0, 0, 0, 0.16);
-}
-
-[data-theme="light"] .feature-desc kbd {
-  background: rgba(0, 0, 0, 0.07);
-  border-color: rgba(0, 0, 0, 0.14);
-}
-
-/* Responsive: collapse to 2 cols on narrow viewports */
-@media (max-width: 540px) {
-  .feature-grid {
-    grid-template-columns: repeat(2, 1fr);
-  }
-  .welcome-card {
-    padding: 28px 20px 24px;
-    border-radius: 20px;
-  }
 }
 
 /* ══════════════════════════════════════════════════════════════
@@ -1366,4 +856,453 @@ body.focus-mode .stage {
   opacity: 0.4;
   border: 1px dashed var(--border) !important;
   background: var(--glass-strong) !important;
+}
+
+/* ---------- Bookmarks Search and Filter ---------- */
+.drawer-search-container {
+  margin-bottom: 12px;
+}
+#bookmarkSearchInput {
+  width: 100%;
+  background: var(--glass);
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  padding: 8px 10px;
+  font-size: 13px;
+  color: var(--text);
+  outline: none;
+  transition: border-color .15s ease;
+}
+#bookmarkSearchInput::placeholder {
+  color: var(--text-dim);
+}
+#bookmarkSearchInput:focus {
+  border-color: var(--text-dim);
+}
+
+/* ---------- Task List Improvements ---------- */
+.card-head-left {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+}
+.clear-tasks-btn {
+  background: transparent;
+  border: none;
+  color: var(--text-dim);
+  font-size: 11px;
+  cursor: pointer;
+  transition: color .15s ease;
+  padding: 2px 4px;
+  font-weight: 500;
+}
+.clear-tasks-btn:hover {
+  color: var(--text);
+}
+.task-edit-input {
+  flex: 1;
+  min-width: 0;
+  width: 100%;
+  background: var(--glass-strong);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 1px 6px;
+  margin: 0;
+  height: 20px;
+  font-size: 13px;
+  color: var(--text);
+  outline: none;
+  font-family: inherit;
+  box-sizing: border-box;
+}
+.task-edit-input:focus {
+  border-color: var(--text-dim);
+}
+
+/* ---------- Whiteboard Locked State ---------- */
+.board.board-locked .photo {
+  cursor: default;
+}
+.board.board-locked .photo:active {
+  cursor: default;
+}
+.board.board-locked .photo .resize,
+.board.board-locked .photo .del {
+  display: none !important;
+}
+
+/* ---------- screen-wide background image ---------- */
+.screen-bg-container {
+  position: fixed;
+  inset: 0;
+  z-index: 0; /* Behind everything */
+  pointer-events: none;
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+  transition: filter 0.3s ease;
+}
+
+.screen-bg-overlay {
+  position: absolute;
+  inset: 0;
+  background: #000000;
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+
+[data-theme="light"] .screen-bg-overlay {
+  background: #ffffff;
+}
+
+/* Background Settings content styling */
+.bg-settings-content {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.bg-drop-zone {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  border: 1.5px dashed var(--border);
+  border-radius: 12px;
+  padding: 20px 10px;
+  text-align: center;
+  cursor: pointer;
+  background: var(--glass);
+  transition: background 0.15s ease, border-color 0.15s ease;
+  margin-top: 4px;
+}
+
+.bg-drop-zone:hover,
+.bg-drop-zone.dragover {
+  background: var(--glass-strong);
+  border-color: var(--text-dim);
+}
+
+.bg-drop-icon {
+  font-size: 24px;
+}
+
+.bg-drop-text {
+  font-size: 11px;
+  color: var(--text-dim);
+  line-height: 1.4;
+}
+
+.bg-drop-text .browse-link {
+  color: var(--text);
+  text-decoration: underline;
+  font-weight: 500;
+}
+
+/* Control sliders styling */
+.control-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.control-label-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.control-group label {
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--text-dim);
+}
+
+.control-value {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.control-range {
+  -webkit-appearance: none;
+  width: 100%;
+  height: 4px;
+  border-radius: 2px;
+  background: var(--border);
+  outline: none;
+}
+
+.control-range::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: var(--text);
+  cursor: pointer;
+  transition: transform 0.1s ease;
+}
+
+.control-range::-webkit-slider-thumb:hover {
+  transform: scale(1.2);
+}
+
+.bg-action-btn {
+  width: 100%;
+  padding: 8px;
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--text-dim);
+}
+
+.clear-bg-btn:not(:disabled) {
+  color: #ff6b6b;
+  border-color: rgba(255, 107, 107, 0.35);
+  cursor: pointer;
+}
+
+[data-theme="light"] .clear-bg-btn:not(:disabled) {
+  color: #e03131;
+  border-color: rgba(224, 49, 49, 0.35);
+}
+
+.clear-bg-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.clear-bg-btn:not(:disabled):hover {
+  background: rgba(255, 107, 107, 0.15);
+}
+
+[data-theme="light"] .clear-bg-btn:not(:disabled):hover {
+  background: rgba(224, 49, 49, 0.1);
+}
+
+/* Help Overlay styling */
+.help-drawer-content {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  overflow-y: auto;
+}
+
+.help-drawer-content h3 {
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 11.5px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--text);
+  margin: 0 0 8px 0;
+}
+
+.help-drawer-content ul {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  font-size: 11px;
+  color: var(--text-dim);
+  line-height: 1.4;
+}
+
+.help-drawer-content ul li strong {
+  color: var(--text);
+}
+
+.help-drawer-content kbd {
+  font-family: inherit;
+  font-size: 10px;
+  font-weight: 600;
+  background: var(--glass-strong);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 1px 4px;
+  color: var(--text);
+}
+
+/* Focus Mode Notification Banner */
+.focus-notification {
+  position: fixed;
+  bottom: 24px;
+  left: 50%;
+  transform: translateX(-50%) translateY(10px);
+  background: var(--glass-strong);
+  border: 1px solid var(--border);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  padding: 8px 16px;
+  border-radius: 30px;
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--text);
+  z-index: 100;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.3s ease, transform 0.3s ease;
+  letter-spacing: 0.5px;
+}
+
+.focus-notification.visible {
+  opacity: 1;
+  transform: translateX(-50%) translateY(0);
+}
+
+/* ---------- Focus Mode Countdown Timer Layout ---------- */
+.clock-view {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 100%;
+}
+
+.timer-view {
+  display: none;
+  flex-direction: column;
+  align-items: center;
+  width: 100%;
+}
+
+/* Toggle visibility in Focus Mode */
+.focus-mode .clock-view {
+  display: none;
+}
+
+.focus-mode .timer-view {
+  display: flex;
+}
+
+.timer-display-container {
+  position: relative;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  width: 100%;
+}
+
+.timer-time {
+  font-family: 'Space Grotesk', sans-serif;
+  font-weight: 700;
+  font-size: clamp(96px, 14vw, 190px);
+  letter-spacing: -2px;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+  color: var(--text);
+  cursor: pointer;
+  transition: transform 0.15s ease, opacity 0.15s ease;
+  user-select: none;
+  pointer-events: auto;
+}
+
+.timer-time:hover {
+  transform: scale(1.02);
+  opacity: 0.85;
+}
+
+.timer-input {
+  display: none;
+  font-family: 'Space Grotesk', sans-serif;
+  font-weight: 700;
+  font-size: clamp(96px, 14vw, 190px);
+  letter-spacing: -2px;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+  color: var(--text);
+  background: transparent;
+  border: none;
+  outline: none;
+  text-align: center;
+  width: 100%;
+  pointer-events: auto;
+}
+
+.timer-view.editing .timer-time {
+  display: none;
+}
+
+.timer-view.editing .timer-input {
+  display: block;
+}
+
+
+
+/* Time's Up Expiration Controls */
+.timer-done-btn {
+  display: none;
+  margin-top: 24px;
+  background: var(--text);
+  color: var(--bg);
+  border: 1px solid var(--text);
+  padding: 8px 20px;
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s, transform 0.1s;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+  pointer-events: auto;
+  z-index: 10;
+}
+
+.timer-done-btn:hover {
+  background: transparent;
+  color: var(--text);
+}
+
+.timer-done-btn:active {
+  transform: scale(0.97);
+}
+
+.timer-view.finished .timer-done-btn {
+  display: block;
+}
+
+.timer-shortcuts-help {
+  margin-top: 10px;
+  font-size: 11px;
+  color: var(--text-dim);
+  opacity: 0;
+  transition: opacity 0.15s ease;
+  user-select: none;
+  pointer-events: none;
+  font-weight: 500;
+  letter-spacing: 0.3px;
+}
+
+/* Show guide when timer is paused or running and not editing */
+.timer-view.paused:not(.editing) .timer-shortcuts-help,
+.timer-view.running:not(.editing) .timer-shortcuts-help {
+  opacity: 0.55;
+}
+
+/* Screen border pulsing visual flash */
+.timer-flash-active::after {
+  content: '';
+  position: fixed;
+  inset: 0;
+  border: 6px solid var(--text);
+  pointer-events: none;
+  z-index: 9999;
+  animation: timer-border-flash 1.5s infinite ease-in-out;
+}
+
+@keyframes timer-border-flash {
+  0%, 100% { opacity: 0.1; }
+  50% { opacity: 0.5; }
+}
+
+/* Slide-hide toolbar when timer is actively running in Focus Mode */
+.timer-running .vertical-toolbar {
+  opacity: 0 !important;
+  pointer-events: none !important;
+  transform: translateY(-50%) translateX(-24px) !important;
 }

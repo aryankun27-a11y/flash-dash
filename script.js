@@ -36,6 +36,90 @@ const store = {
   }
 };
 
+// ---------- IndexedDB Storage Helper for Large Binary Blobs ----------
+const dbName = 'FlashDashDB';
+const storeName = 'AssetsStore';
+
+function getDB() {
+  return new Promise((resolve, reject) => {
+    const request = indexedDB.open(dbName, 1);
+    request.onupgradeneeded = (e) => {
+      const db = e.target.result;
+      if (!db.objectStoreNames.contains(storeName)) {
+        db.createObjectStore(storeName);
+      }
+    };
+    request.onsuccess = (e) => resolve(e.target.result);
+    request.onerror = (e) => reject(e.target.error);
+  });
+}
+
+const largeStore = {
+  async get(key, fallback) {
+    try {
+      const db = await getDB();
+      return new Promise((resolve) => {
+        const transaction = db.transaction(storeName, 'readonly');
+        const storeObj = transaction.objectStore(storeName);
+        const req = storeObj.get(key);
+        req.onsuccess = () => {
+          resolve(req.result !== undefined ? req.result : fallback);
+        };
+        req.onerror = () => resolve(fallback);
+      });
+    } catch (e) {
+      return fallback;
+    }
+  },
+  async set(key, value) {
+    try {
+      const db = await getDB();
+      return new Promise((resolve, reject) => {
+        const transaction = db.transaction(storeName, 'readwrite');
+        const storeObj = transaction.objectStore(storeName);
+        const req = storeObj.put(value, key);
+        req.onsuccess = () => resolve();
+        req.onerror = () => reject(req.error);
+      });
+    } catch (e) {
+      console.error('IndexedDB write error:', e);
+    }
+  },
+  async delete(key) {
+    try {
+      const db = await getDB();
+      return new Promise((resolve) => {
+        const transaction = db.transaction(storeName, 'readwrite');
+        const storeObj = transaction.objectStore(storeName);
+        const req = storeObj.delete(key);
+        req.onsuccess = () => resolve();
+        req.onerror = () => resolve();
+      });
+    } catch (e) {
+      console.error('IndexedDB delete error:', e);
+    }
+  }
+};
+
+// Helper: Convert Base64/DataURL to Blob
+function dataURLtoBlob(dataurl) {
+  try {
+    const arr = dataurl.split(',');
+    const mimeMatch = arr[0].match(/:(.*?);/);
+    const mime = mimeMatch ? mimeMatch[1] : 'image/png';
+    const bstr = atob(arr[1]);
+    let n = bstr.length;
+    const u8arr = new Uint8Array(n);
+    while (n--) {
+      u8arr[n] = bstr.charCodeAt(n);
+    }
+    return new Blob([u8arr], { type: mime });
+  } catch (e) {
+    console.error('Failed to convert base64 to Blob:', e);
+    return null;
+  }
+}
+
 // ---------- clock ----------
 function tickClock() {
   const now = new Date();
@@ -65,10 +149,16 @@ const bookmarksToggle = document.getElementById('bookmarksToggle');
 const bookmarksDrawer = document.getElementById('bookmarksDrawer');
 const closeBookmarks = document.getElementById('closeBookmarks');
 const bookmarksList = document.getElementById('bookmarksList');
+const bookmarkSearchInput = document.getElementById('bookmarkSearchInput');
+
+let cachedBookmarks = [];
 
 bookmarksToggle.addEventListener('click', () => {
+  if (typeof bgSettingsDrawer !== 'undefined') bgSettingsDrawer.classList.remove('open');
+  if (typeof helpDrawer !== 'undefined') helpDrawer.classList.remove('open');
   bookmarksDrawer.classList.toggle('open');
   if (bookmarksDrawer.classList.contains('open')) {
+    bookmarkSearchInput.value = '';
     loadBookmarks();
   }
 });
@@ -77,10 +167,34 @@ closeBookmarks.addEventListener('click', () => {
   bookmarksDrawer.classList.remove('open');
 });
 
-// Close drawer if clicking outside of it and not on the toggle button
-document.addEventListener('click', (e) => {
-  if (!bookmarksDrawer.contains(e.target) && !bookmarksToggle.contains(e.target)) {
+// ---------- help overlay drawer ----------
+const helpToggleBtn = document.getElementById('helpToggleBtn');
+const helpDrawer = document.getElementById('helpDrawer');
+const closeHelp = document.getElementById('closeHelp');
+
+if (helpToggleBtn && helpDrawer) {
+  helpToggleBtn.addEventListener('click', () => {
     bookmarksDrawer.classList.remove('open');
+    if (typeof bgSettingsDrawer !== 'undefined') bgSettingsDrawer.classList.remove('open');
+    helpDrawer.classList.toggle('open');
+  });
+}
+if (closeHelp && helpDrawer) {
+  closeHelp.addEventListener('click', () => {
+    helpDrawer.classList.remove('open');
+  });
+}
+
+// Close drawers if clicking outside of them
+document.addEventListener('click', (e) => {
+  if (bookmarksDrawer && !bookmarksDrawer.contains(e.target) && bookmarksToggle && !bookmarksToggle.contains(e.target)) {
+    bookmarksDrawer.classList.remove('open');
+  }
+  if (bgSettingsDrawer && !bgSettingsDrawer.contains(e.target) && bgSettingsToggleBtn && !bgSettingsToggleBtn.contains(e.target)) {
+    bgSettingsDrawer.classList.remove('open');
+  }
+  if (helpDrawer && !helpDrawer.contains(e.target) && helpToggleBtn && !helpToggleBtn.contains(e.target)) {
+    helpDrawer.classList.remove('open');
   }
 });
 
@@ -101,7 +215,8 @@ async function loadBookmarks() {
         });
       }
       traverse(tree);
-      renderBookmarksList(flat);
+      cachedBookmarks = flat;
+      filterAndRenderBookmarks();
     });
   } else {
     // Fallback mock bookmarks for non-extension testing
@@ -112,9 +227,26 @@ async function loadBookmarks() {
       { title: 'Hacker News', url: 'https://news.ycombinator.com' },
       { title: 'YouTube', url: 'https://youtube.com' }
     ];
-    renderBookmarksList(mock);
+    cachedBookmarks = mock;
+    filterAndRenderBookmarks();
   }
 }
+
+function filterAndRenderBookmarks() {
+  const query = bookmarkSearchInput.value.toLowerCase().trim();
+  if (!query) {
+    renderBookmarksList(cachedBookmarks);
+    return;
+  }
+  const filtered = cachedBookmarks.filter(bm => {
+    const titleMatch = bm.title && bm.title.toLowerCase().includes(query);
+    const urlMatch = bm.url && bm.url.toLowerCase().includes(query);
+    return titleMatch || urlMatch;
+  });
+  renderBookmarksList(filtered);
+}
+
+bookmarkSearchInput.addEventListener('input', filterAndRenderBookmarks);
 
 function renderBookmarksList(bookmarks) {
   bookmarksList.innerHTML = '';
@@ -131,6 +263,9 @@ function renderBookmarksList(bookmarks) {
     a.className = 'bookmark-item';
     a.href = bm.url;
     a.addEventListener('click', (e) => {
+      if (e.metaKey || e.ctrlKey || e.button === 1) {
+        return; // default new tab/background window redirection
+      }
       e.preventDefault();
       if (window.chrome && chrome.tabs) {
         chrome.tabs.getCurrent((tab) => {
@@ -181,7 +316,7 @@ function renderTasks(tasks) {
   tasks.forEach((task, idx) => {
     const li = document.createElement('li');
     li.className = 'task-item';
-    li.setAttribute('draggable', 'true');
+    li.setAttribute('draggable', 'false');
     li.dataset.index = idx;
 
     li.addEventListener('dragstart', (e) => {
@@ -203,19 +338,101 @@ function renderTasks(tasks) {
       renderTasks(reordered);
     });
 
+    // dedicated visual drag handle
+    const dragHandle = document.createElement('div');
+    dragHandle.className = 'task-drag-handle';
+    dragHandle.innerHTML = `<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><circle cx="9" cy="5" r="1" fill="currentColor"/><circle cx="9" cy="12" r="1" fill="currentColor"/><circle cx="9" cy="19" r="1" fill="currentColor"/><circle cx="15" cy="5" r="1" fill="currentColor"/><circle cx="15" cy="12" r="1" fill="currentColor"/><circle cx="15" cy="19" r="1" fill="currentColor"/></svg>`;
+    
+    // Toggle draggable state on grab handle interaction
+    dragHandle.addEventListener('mousedown', () => {
+      li.setAttribute('draggable', 'true');
+    });
+    dragHandle.addEventListener('mouseup', () => {
+      li.setAttribute('draggable', 'false');
+    });
+    dragHandle.addEventListener('touchstart', () => {
+      li.setAttribute('draggable', 'true');
+    });
+    dragHandle.addEventListener('touchend', () => {
+      li.setAttribute('draggable', 'false');
+    });
+
     const check = document.createElement('div');
     check.className = 'task-check' + (task.done ? ' done' : '');
-    check.addEventListener('click', async () => {
+    check.setAttribute('role', 'checkbox');
+    check.setAttribute('aria-checked', task.done ? 'true' : 'false');
+    check.setAttribute('tabindex', '0');
+
+    const toggleDone = async () => {
       const current = await store.get('tasks', []);
       current[idx].done = !current[idx].done;
       await store.set('tasks', current);
       renderTasks(current);
       updateCount(current);
+    };
+
+    check.addEventListener('click', toggleDone);
+    check.addEventListener('keydown', (e) => {
+      if (e.key === ' ' || e.key === 'Enter') {
+        e.preventDefault();
+        toggleDone();
+      }
     });
 
     const text = document.createElement('span');
     text.className = 'task-text' + (task.done ? ' done' : '');
     text.textContent = task.text;
+
+    // Double-click inline editing
+    text.addEventListener('dblclick', (e) => {
+      if (task.done) return;
+      e.stopPropagation();
+
+      const editInput = document.createElement('input');
+      editInput.type = 'text';
+      editInput.className = 'task-edit-input';
+      editInput.value = task.text;
+
+      li.replaceChild(editInput, text);
+      editInput.focus();
+      editInput.select(); // Auto-select text for easier replacement
+
+      // Prevent input interactions from triggering drag-and-drop or select on parent
+      editInput.addEventListener('mousedown', (ev) => ev.stopPropagation());
+      editInput.addEventListener('click', (ev) => ev.stopPropagation());
+      editInput.addEventListener('dblclick', (ev) => ev.stopPropagation());
+
+      let finished = false;
+      async function finishEdit() {
+        if (finished) return;
+        finished = true;
+        const newText = editInput.value.trim();
+        if (newText && newText !== task.text) {
+          task.text = newText;
+          text.textContent = newText;
+          li.replaceChild(text, editInput);
+
+          const current = await store.get('tasks', []);
+          current[idx].text = newText;
+          await store.set('tasks', current);
+        } else {
+          li.replaceChild(text, editInput);
+        }
+      }
+
+      editInput.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') {
+          e.preventDefault();
+          finishEdit();
+        } else if (e.key === 'Escape') {
+          e.preventDefault();
+          li.replaceChild(text, editInput);
+          finished = true;
+        }
+      });
+
+      editInput.addEventListener('blur', finishEdit);
+    });
 
     const del = document.createElement('span');
     del.className = 'task-del';
@@ -228,6 +445,7 @@ function renderTasks(tasks) {
       updateCount(current);
     });
 
+    li.appendChild(dragHandle);
     li.appendChild(check);
     li.appendChild(text);
     li.appendChild(del);
@@ -271,6 +489,16 @@ taskInput.addEventListener('keydown', async (e) => {
   updateCount(current);
 });
 
+const clearCompletedBtn = document.getElementById('clearCompletedBtn');
+clearCompletedBtn.addEventListener('click', async () => {
+  const current = await store.get('tasks', []);
+  const incomplete = current.filter(t => !t.done);
+  if (current.length === incomplete.length) return;
+  await store.set('tasks', incomplete);
+  renderTasks(incomplete);
+  updateCount(incomplete);
+});
+
 // ---------- theme ----------
 const themeToggle = document.getElementById('themeToggle');
 const themeIcon = document.getElementById('themeIcon');
@@ -306,74 +534,190 @@ const clearPhotosBtn = document.getElementById('clearPhotosBtn');
 
 // Tracks the highest z-index used so far so we can always bring one more to front
 let _photoZCounter = 10;
+let loadedPhotos = [];
+const photoObjectUrls = new Map(); // photoId -> ObjectURL string
 
-function makeDraggable(el, photo, onChange) {
-  el.addEventListener('pointerdown', (e) => {
-    if (e.target.closest('.del') || e.target.closest('.resize')) return;
-    e.preventDefault();
-    const startX = e.clientX, startY = e.clientY;
-    const origX = photo.x, origY = photo.y;
-    el.setPointerCapture(e.pointerId);
-    el.style.cursor = 'grabbing';
+function updatePhotoPositionStyle(el, photo) {
+  el.style.left = (photo.xPercent * window.innerWidth) + 'px';
+  el.style.top = (photo.yPercent * window.innerHeight) + 'px';
+  el.style.width = (photo.w || 150) + 'px';
+  el.style.height = (photo.h || 150) + 'px';
+}
 
-    function move(ev) {
-      const dx = ev.clientX - startX, dy = ev.clientY - startY;
-      photo.x = origX + dx;
-      photo.y = origY + dy;
-      el.style.left = photo.x + 'px';
-      el.style.top = photo.y + 'px';
+function updateAllPhotoStyles() {
+  const photoEls = board.querySelectorAll('.photo');
+  photoEls.forEach(el => {
+    const id = el.dataset.id;
+    const photo = loadedPhotos.find(p => p.id === id);
+    if (photo) {
+      updatePhotoPositionStyle(el, photo);
     }
-    function up() {
-      el.removeEventListener('pointermove', move);
-      el.removeEventListener('pointerup', up);
+  });
+}
+window.addEventListener('resize', updateAllPhotoStyles);
+const RESIZE_BORDER = 8;
+
+function getResizeDirection(el, clientX, clientY) {
+  const rect = el.getBoundingClientRect();
+  const x = clientX - rect.left;
+  const y = clientY - rect.top;
+  
+  let dir = "";
+  
+  if (y < RESIZE_BORDER) dir += "n";
+  else if (y > rect.height - RESIZE_BORDER) dir += "s";
+  
+  if (x < RESIZE_BORDER) dir += "w";
+  else if (x > rect.width - RESIZE_BORDER) dir += "e";
+  
+  return dir;
+}
+
+function makeResizableAndDraggable(el, photo, onChange) {
+  // Update mouse cursor on hover near borders/corners
+  el.addEventListener('pointermove', (e) => {
+    if (board.classList.contains('board-locked')) return;
+    if (e.target.closest('.del')) {
+      el.style.cursor = 'pointer';
+      return;
+    }
+    const dir = getResizeDirection(el, e.clientX, e.clientY);
+    if (dir) {
+      el.style.cursor = dir + '-resize';
+    } else {
       el.style.cursor = 'grab';
-      onChange();
     }
-    el.addEventListener('pointermove', move);
-    el.addEventListener('pointerup', up);
   });
-}
 
-function makeResizable(el, handle, photo, onChange) {
-  handle.addEventListener('pointerdown', (e) => {
+  el.addEventListener('pointerdown', (e) => {
+    if (board.classList.contains('board-locked')) return;
+    if (e.target.closest('.del')) return;
     e.preventDefault();
-    e.stopPropagation();
+    
+    const dir = getResizeDirection(el, e.clientX, e.clientY);
     const startX = e.clientX, startY = e.clientY;
-    const origW = photo.w, origH = photo.h;
-    handle.setPointerCapture(e.pointerId);
-
-    function move(ev) {
-      const dx = ev.clientX - startX, dy = ev.clientY - startY;
-      photo.w = Math.max(50, origW + dx);
-      photo.h = Math.max(50, origH + dy);
-      el.style.width = photo.w + 'px';
-      el.style.height = photo.h + 'px';
+    const origW = photo.w || 150;
+    const origH = photo.h || 150;
+    const origX = photo.xPercent * window.innerWidth;
+    const origY = photo.yPercent * window.innerHeight;
+    
+    el.setPointerCapture(e.pointerId);
+    
+    if (dir) {
+      // Edge resizing mode
+      function moveResize(ev) {
+        const dx = ev.clientX - startX;
+        const dy = ev.clientY - startY;
+        
+        let newW = origW;
+        let newH = origH;
+        let newX = origX;
+        let newY = origY;
+        
+        if (dir.includes("e")) {
+          newW = Math.max(50, origW + dx);
+        } else if (dir.includes("w")) {
+          const possibleW = origW - dx;
+          if (possibleW >= 50) {
+            newW = possibleW;
+            newX = origX + dx;
+          }
+        }
+        
+        if (dir.includes("s")) {
+          newH = Math.max(50, origH + dy);
+        } else if (dir.includes("n")) {
+          const possibleH = origH - dy;
+          if (possibleH >= 50) {
+            newH = possibleH;
+            newY = origY + dy;
+          }
+        }
+        
+        photo.w = newW;
+        photo.h = newH;
+        photo.xPercent = newX / window.innerWidth;
+        photo.yPercent = newY / window.innerHeight;
+        
+        el.style.width = newW + 'px';
+        el.style.height = newH + 'px';
+        el.style.left = newX + 'px';
+        el.style.top = newY + 'px';
+      }
+      
+      function upResize() {
+        el.removeEventListener('pointermove', moveResize);
+        el.removeEventListener('pointerup', upResize);
+        onChange();
+      }
+      
+      el.addEventListener('pointermove', moveResize);
+      el.addEventListener('pointerup', upResize);
+      
+    } else {
+      // General dragging mode
+      el.style.cursor = 'grabbing';
+      
+      function moveDrag(ev) {
+        const dx = ev.clientX - startX;
+        const dy = ev.clientY - startY;
+        
+        const x = origX + dx;
+        const y = origY + dy;
+        
+        const margin = 20;
+        const clampedX = Math.max(margin, Math.min(window.innerWidth - (photo.w || 150) - margin, x));
+        const clampedY = Math.max(margin, Math.min(window.innerHeight - (photo.h || 150) - margin, y));
+        
+        photo.xPercent = clampedX / window.innerWidth;
+        photo.yPercent = clampedY / window.innerHeight;
+        
+        el.style.left = clampedX + 'px';
+        el.style.top = clampedY + 'px';
+      }
+      
+      function upDrag() {
+        el.removeEventListener('pointermove', moveDrag);
+        el.removeEventListener('pointerup', upDrag);
+        el.style.cursor = 'grab';
+        onChange();
+      }
+      
+      el.addEventListener('pointermove', moveDrag);
+      el.addEventListener('pointerup', upDrag);
     }
-    function up() {
-      handle.removeEventListener('pointermove', move);
-      handle.removeEventListener('pointerup', up);
-      onChange();
-    }
-    handle.addEventListener('pointermove', move);
-    handle.addEventListener('pointerup', up);
   });
 }
 
-function renderPhotoEl(photo) {
+async function renderPhotoEl(photo) {
   const wrap = document.createElement('div');
   wrap.className = 'photo';
-  wrap.style.left = photo.x + 'px';
-  wrap.style.top = photo.y + 'px';
-  wrap.style.width = photo.w + 'px';
-  wrap.style.height = photo.h + 'px';
+  wrap.dataset.id = photo.id;
+  
+  updatePhotoPositionStyle(wrap, photo);
 
-  // Apply persisted z-index (default to 2 if none saved yet)
+  // Apply persisted z-index
   const savedZ = photo.z || 2;
   wrap.style.zIndex = savedZ;
   if (savedZ > _photoZCounter) _photoZCounter = savedZ;
 
   const img = document.createElement('img');
-  img.src = photo.src;
+  
+  // Load image blob
+  let srcUrl = '';
+  if (photo.src && photo.src.startsWith('data:')) {
+    srcUrl = photo.src;
+  } else {
+    const blob = await largeStore.get('photo_img_' + photo.id);
+    if (blob) {
+      if (photoObjectUrls.has(photo.id)) {
+        URL.revokeObjectURL(photoObjectUrls.get(photo.id));
+      }
+      srcUrl = URL.createObjectURL(blob);
+      photoObjectUrls.set(photo.id, srcUrl);
+    }
+  }
+  img.src = srcUrl;
   wrap.appendChild(img);
 
   const del = document.createElement('div');
@@ -383,48 +727,59 @@ function renderPhotoEl(photo) {
     const photos = await store.get('photos', []);
     const filtered = photos.filter(p => p.id !== photo.id);
     await store.set('photos', filtered);
+    
+    // Cleanup IndexedDB and URL caching
+    await largeStore.delete('photo_img_' + photo.id);
+    if (photoObjectUrls.has(photo.id)) {
+      URL.revokeObjectURL(photoObjectUrls.get(photo.id));
+      photoObjectUrls.delete(photo.id);
+    }
     wrap.remove();
   });
   wrap.appendChild(del);
 
-  const resize = document.createElement('div');
-  resize.className = 'resize';
-  wrap.appendChild(resize);
-
-  board.appendChild(wrap);
-
   async function persist() {
     const photos = await store.get('photos', []);
     const idx = photos.findIndex(p => p.id === photo.id);
-    if (idx > -1) { photos[idx] = photo; await store.set('photos', photos); }
+    if (idx > -1) {
+      photos[idx] = {
+        id: photo.id,
+        xPercent: photo.xPercent,
+        yPercent: photo.yPercent,
+        w: photo.w || 150,
+        h: photo.h || 150,
+        z: photo.z
+      };
+      await store.set('photos', photos);
+    }
   }
+
+  board.appendChild(wrap);
 
   // Click (not drag) → bring this photo to the front
   wrap.addEventListener('pointerdown', () => {
+    if (board.classList.contains('board-locked')) return;
     _photoZCounter += 1;
     photo.z = _photoZCounter;
     wrap.style.zIndex = _photoZCounter;
-    // Flash a subtle ring to confirm the action
     wrap.classList.add('photo-lifted');
     setTimeout(() => wrap.classList.remove('photo-lifted'), 350);
     persist();
   });
 
-  makeDraggable(wrap, photo, persist);
-  makeResizable(wrap, resize, photo, persist);
+  makeResizableAndDraggable(wrap, photo, persist);
 }
 
 async function renderBoard() {
-  const photos = await store.get('photos', []);
+  loadedPhotos = await store.get('photos', []);
   board.innerHTML = '';
-  photos.forEach(renderPhotoEl);
+  loadedPhotos.forEach(renderPhotoEl);
 }
-renderBoard();
 
 addPhotoBtn.addEventListener('click', () => {
-  // Close any open panels before opening the file picker
+  // Close drawers before opening the file picker
   bookmarksDrawer.classList.remove('open');
-  pinPickerPanel.classList.remove('open');
+  if (typeof bgSettingsDrawer !== 'undefined') bgSettingsDrawer.classList.remove('open');
   photoInput.click();
 });
 
@@ -434,6 +789,15 @@ clearPhotosBtn.addEventListener('click', async () => {
 
   const confirmed = confirm(`Remove all ${photos.length} photo${photos.length === 1 ? '' : 's'} from the board?`);
   if (!confirmed) return;
+
+  // Revoke all URL references
+  photoObjectUrls.forEach(url => URL.revokeObjectURL(url));
+  photoObjectUrls.clear();
+
+  // Delete all photos from storage
+  for (const photo of photos) {
+    await largeStore.delete('photo_img_' + photo.id);
+  }
 
   await store.set('photos', []);
   renderBoard();
@@ -446,18 +810,20 @@ async function addPhotos(files, dropCoords = null) {
   for (let i = 0; i < files.length; i++) {
     const file = files[i];
     if (!file.type.startsWith('image/')) continue;
-    const dataUrl = await new Promise((res) => {
-      const reader = new FileReader();
-      reader.onload = () => res(reader.result);
-      reader.readAsDataURL(file);
-    });
 
-    // ── detect natural aspect ratio ────────────────────────────
+    // Detect natural aspect ratio using temporary Object URL
     const { natW, natH } = await new Promise((res) => {
       const img = new Image();
-      img.onload = () => res({ natW: img.naturalWidth, natH: img.naturalHeight });
-      img.onerror = () => res({ natW: 1, natH: 1 }); // fallback to square
-      img.src = dataUrl;
+      const tempUrl = URL.createObjectURL(file);
+      img.onload = () => {
+        res({ natW: img.naturalWidth, natH: img.naturalHeight });
+        URL.revokeObjectURL(tempUrl);
+      };
+      img.onerror = () => {
+        res({ natW: 1, natH: 1 });
+        URL.revokeObjectURL(tempUrl);
+      };
+      img.src = tempUrl;
     });
 
     const MAX_SIDE = 150;
@@ -470,44 +836,44 @@ async function addPhotos(files, dropCoords = null) {
       w = Math.round(MAX_SIDE * (natW / natH));
     }
 
-    // ── pick a placement position ──────────────────────────────
     let x, y;
-
     if (dropCoords) {
-      // Place exactly centered on the cursor, offset multiple files slightly
       const offset = i * 15;
       x = dropCoords.x - w / 2 + offset;
       y = dropCoords.y - h / 2 + offset;
     } else if (existingSnapshot.length > 0) {
-      // Pick a different random anchor for each new image
       const anchor = existingSnapshot[Math.floor(Math.random() * existingSnapshot.length)];
+      const anchorX = (anchor.xPercent || 0.5) * window.innerWidth;
+      const anchorY = (anchor.yPercent || 0.5) * window.innerHeight;
 
-      // Random offset: ±100–200px in each axis, with randomised sign
       const minOff = 100, maxOff = 200;
       const randOff = () => (minOff + Math.random() * (maxOff - minOff)) * (Math.random() < 0.5 ? 1 : -1);
 
-      x = anchor.x + randOff();
-      y = anchor.y + randOff();
+      x = anchorX + randOff();
+      y = anchorY + randOff();
     } else {
-      // No existing photos — land at centre of the viewport
       x = window.innerWidth  / 2 - w / 2;
       y = window.innerHeight / 2 - h / 2;
     }
 
-    // ── clamp so the image stays inside the visible board area ──
     const margin = 20;
     x = Math.max(margin, Math.min(window.innerWidth  - w - margin, x));
     y = Math.max(margin, Math.min(window.innerHeight - h - margin, y));
 
     _photoZCounter += 1;
+    const photoId = Date.now() + Math.random().toString(36).slice(2);
+    
+    // Save image to IndexedDB
+    await largeStore.set('photo_img_' + photoId, file);
+
     const photo = {
-      id: Date.now() + Math.random().toString(36).slice(2),
-      src: dataUrl,
-      x,
-      y,
-      w,
-      h,
-      z: _photoZCounter
+      id: photoId,
+      xPercent: x / window.innerWidth,
+      yPercent: y / window.innerHeight,
+      w: w,
+      h: h,
+      z: _photoZCounter,
+      caption: ""
     };
     photos.push(photo);
     existingSnapshot.push(photo);
@@ -527,6 +893,8 @@ photoInput.addEventListener('change', async (e) => {
 let dragCounter = 0;
 document.addEventListener('dragenter', (e) => {
   e.preventDefault();
+  // Bypass document-wide drag overlay if background settings drawer is open
+  if (typeof bgSettingsDrawer !== 'undefined' && bgSettingsDrawer.classList.contains('open')) return;
   dragCounter++;
   if (e.dataTransfer.types.includes('Files')) {
     document.getElementById('dragOverlay').classList.add('active');
@@ -539,6 +907,7 @@ document.addEventListener('dragover', (e) => {
 
 document.addEventListener('dragleave', (e) => {
   e.preventDefault();
+  if (typeof bgSettingsDrawer !== 'undefined' && bgSettingsDrawer.classList.contains('open')) return;
   dragCounter--;
   if (dragCounter === 0) {
     document.getElementById('dragOverlay').classList.remove('active');
@@ -547,6 +916,7 @@ document.addEventListener('dragleave', (e) => {
 
 document.addEventListener('drop', async (e) => {
   e.preventDefault();
+  if (typeof bgSettingsDrawer !== 'undefined' && bgSettingsDrawer.classList.contains('open')) return;
   dragCounter = 0;
   document.getElementById('dragOverlay').classList.remove('active');
 
@@ -557,687 +927,848 @@ document.addEventListener('drop', async (e) => {
   }
 });
 
-// ---------- Pinned App Shortcuts ----------
-const pinShortcutsBtn = document.getElementById('pinShortcutsBtn');
-const pinPickerPanel  = document.getElementById('pinPickerPanel');
-const closePinPicker  = document.getElementById('closePinPicker');
-const pinPickerList   = document.getElementById('pinPickerList');
-const pinPickerHint   = document.getElementById('pinPickerHint');
-const pinnedShortcutsGroup = document.getElementById('pinnedShortcutsGroup');
-
-const MAX_PINS = 6;
-
-// Show/hide the + add-shortcut button based on current pin count
-function syncPinBtn(pinnedCount) {
-  pinShortcutsBtn.style.display = pinnedCount >= MAX_PINS ? 'none' : '';
-}
-
-// Open / close pin picker panel
-pinShortcutsBtn.addEventListener('click', () => {
-  const isOpen = pinPickerPanel.classList.contains('open');
-  // Close bookmarks drawer if open
-  bookmarksDrawer.classList.remove('open');
-  pinPickerPanel.classList.toggle('open', !isOpen);
-  if (!isOpen) loadPinPicker();
-});
-
-closePinPicker.addEventListener('click', () => {
-  pinPickerPanel.classList.remove('open');
-});
-
-// Close if clicking outside
-document.addEventListener('click', (e) => {
-  if (!pinPickerPanel.contains(e.target) && !pinShortcutsBtn.contains(e.target)) {
-    pinPickerPanel.classList.remove('open');
-  }
-});
-
-async function loadPinPicker() {
-  pinPickerList.innerHTML = '<div class="bookmark-empty">Loading bookmarks…</div>';
-
-  let allBookmarks = [];
-
-  if (window.chrome && chrome.bookmarks && chrome.bookmarks.getTree) {
-    allBookmarks = await new Promise((res) => {
-      chrome.bookmarks.getTree((tree) => {
-        const flat = [];
-        function traverse(nodes) {
-          nodes.forEach(n => {
-            if (n.url) flat.push({ id: n.id, title: n.title || n.url, url: n.url });
-            if (n.children) traverse(n.children);
-          });
-        }
-        traverse(tree);
-        res(flat);
-      });
-    });
-  } else {
-    // Fallback mock data for non-extension testing
-    allBookmarks = [
-      { id: '1', title: 'Google',       url: 'https://google.com' },
-      { id: '2', title: 'GitHub',       url: 'https://github.com' },
-      { id: '3', title: 'YouTube',      url: 'https://youtube.com' },
-      { id: '4', title: 'Hacker News',  url: 'https://news.ycombinator.com' },
-      { id: '5', title: 'Brave Search', url: 'https://search.brave.com' },
-    ];
-  }
-
-  renderPinPicker(allBookmarks);
-}
-
-async function renderPinPicker(bookmarks) {
-  const pinned = await store.get('pinnedShortcuts', []);
-  pinPickerList.innerHTML = '';
-
-  if (bookmarks.length === 0) {
-    const empty = document.createElement('div');
-    empty.className = 'bookmark-empty';
-    empty.textContent = 'No bookmarks found.';
-    pinPickerList.appendChild(empty);
-    return;
-  }
-
-  bookmarks.forEach(bm => {
-    const isPinned = pinned.some(p => p.url === bm.url);
-    const item = document.createElement('li');
-    item.className = 'pin-picker-item' + (isPinned ? ' pinned' : '');
-
-    // Favicon
-    const img = document.createElement('img');
-    img.className = 'bookmark-icon';
-    img.src = faviconUrl(bm.url);
-    img.alt = '';
-    img.onerror = () => {
-      img.remove();
-      const fb = document.createElement('div');
-      fb.className = 'bookmark-fallback-icon';
-      fb.textContent = (bm.title || 'B').trim().slice(0, 1).toUpperCase();
-      item.insertBefore(fb, item.firstChild);
-    };
-    item.appendChild(img);
-
-    // Title
-    const titleEl = document.createElement('span');
-    titleEl.className = 'bookmark-title';
-    titleEl.textContent = bm.title || bm.url;
-    titleEl.title = bm.url;
-    item.appendChild(titleEl);
-
-    // Check indicator
-    const check = document.createElement('div');
-    check.className = 'pin-check';
-    item.appendChild(check);
-
-    // Toggle pin on click
-    item.addEventListener('click', async () => {
-      const current = await store.get('pinnedShortcuts', []);
-      const idx = current.findIndex(p => p.url === bm.url);
-      if (idx > -1) {
-        // Unpin
-        current.splice(idx, 1);
-        item.classList.remove('pinned');
-      } else {
-        if (current.length >= MAX_PINS) {
-          // Visual shake to indicate max reached
-          pinPickerHint.style.color = 'var(--text)';
-          pinPickerHint.textContent = `All ${MAX_PINS} slots filled. Right-click a pinned icon to unpin it.`;
-          setTimeout(() => {
-            pinPickerHint.style.color = '';
-            pinPickerHint.textContent = `Choose up to ${MAX_PINS} bookmarks to pin as quick-access icons.`;
-          }, 2500);
-          return;
-        }
-        // Pin
-        current.push({ title: bm.title || bm.url, url: bm.url });
-        item.classList.add('pinned');
-      }
-      await store.set('pinnedShortcuts', current);
-      renderPinnedToolbar(current);
-      syncPinBtn(current.length);
-    });
-
-    pinPickerList.appendChild(item);
-  });
-}
-
-// ---------- Right-click context menu for pinned shortcuts ----------
-const shortcutContextMenu = document.getElementById('shortcutContextMenu');
-const ctxUnpin   = document.getElementById('ctxUnpin');
-const ctxOpenLink = document.getElementById('ctxOpenLink');
-
-let _ctxTarget = null; // the shortcut object currently right-clicked
-
-function showContextMenu(x, y, shortcut) {
-  _ctxTarget = shortcut;
-  shortcutContextMenu.style.display = 'block';
-
-  // Position: prefer right of cursor, flip left if too close to edge
-  const menuW = 160;
-  const menuH = shortcutContextMenu.offsetHeight || 80;
-  const left = (x + menuW > window.innerWidth)  ? x - menuW : x;
-  const top  = (y + menuH > window.innerHeight) ? y - menuH : y;
-
-  shortcutContextMenu.style.left = left + 'px';
-  shortcutContextMenu.style.top  = top  + 'px';
-  // Re-trigger animation each time
-  shortcutContextMenu.style.animation = 'none';
-  requestAnimationFrame(() => {
-    shortcutContextMenu.style.animation = '';
-  });
-}
-
-function hideContextMenu() {
-  shortcutContextMenu.style.display = 'none';
-  _ctxTarget = null;
-}
-
-// Dismiss on any click outside the menu
-document.addEventListener('click', (e) => {
-  if (!shortcutContextMenu.contains(e.target)) hideContextMenu();
-});
-
-// Dismiss on Escape
-document.addEventListener('keydown', (e) => {
-  if (e.key === 'Escape') hideContextMenu();
-});
-
-// "Unpin shortcut" action
-ctxUnpin.addEventListener('click', async () => {
-  if (!_ctxTarget) return;
-  const current = await store.get('pinnedShortcuts', []);
-  const updated = current.filter(p => p.url !== _ctxTarget.url);
-  await store.set('pinnedShortcuts', updated);
-  renderPinnedToolbar(updated);
-  syncPinBtn(updated.length);
-  hideContextMenu();
-});
-
-// "Open site" action
-ctxOpenLink.addEventListener('click', () => {
-  if (!_ctxTarget) return;
-  if (window.chrome && chrome.tabs) {
-    chrome.tabs.getCurrent(tab => chrome.tabs.update(tab.id, { url: _ctxTarget.url }));
-  } else {
-    window.location.href = _ctxTarget.url;
-  }
-  hideContextMenu();
-});
-
-function renderPinnedToolbar(pinned) {
-  pinnedShortcutsGroup.innerHTML = '';
-
-  pinned.forEach((p, idx) => {
-    const btn = document.createElement('button');
-    btn.className = 'pinned-shortcut task-btn';
-    btn.setAttribute('data-title', p.title);
-    btn.title = '';  // suppress native tooltip; we use CSS ::after
-    btn.setAttribute('aria-label', p.title);
-    btn.setAttribute('draggable', 'true');
-    btn.dataset.index = idx;
-
-    btn.addEventListener('dragstart', (e) => {
-      btn.classList.add('dragging');
-      e.dataTransfer.setData('text/plain', idx);
-      e.dataTransfer.effectAllowed = 'move';
-    });
-
-    btn.addEventListener('dragend', async () => {
-      btn.classList.remove('dragging');
-      const items = [...pinnedShortcutsGroup.querySelectorAll('.pinned-shortcut')];
-      const current = await store.get('pinnedShortcuts', []);
-      const reordered = items.map(item => {
-        const index = parseInt(item.dataset.index);
-        return current[index];
-      });
-      await store.set('pinnedShortcuts', reordered);
-      renderPinnedToolbar(reordered);
-    });
-
-    const img = document.createElement('img');
-    img.src = faviconUrl(p.url);
-    img.alt = p.title;
-    img.onerror = () => {
-      img.remove();
-      const fb = document.createElement('div');
-      fb.className = 'shortcut-fallback';
-      fb.textContent = (p.title || '?').trim().slice(0, 1).toUpperCase();
-      btn.appendChild(fb);
-    };
-    btn.appendChild(img);
-
-    // Left-click → navigate
-    btn.addEventListener('click', () => {
-      if (window.chrome && chrome.tabs) {
-        chrome.tabs.getCurrent(tab => chrome.tabs.update(tab.id, { url: p.url }));
-      } else {
-        window.location.href = p.url;
-      }
-    });
-
-    // Right-click → show context menu
-    btn.addEventListener('contextmenu', (e) => {
-      e.preventDefault();
-      showContextMenu(e.clientX + 6, e.clientY + 2, p);
-    });
-
-    pinnedShortcutsGroup.appendChild(btn);
-  });
-}
-
-pinnedShortcutsGroup.addEventListener('dragover', (e) => {
-  e.preventDefault();
-  const draggingEl = pinnedShortcutsGroup.querySelector('.pinned-shortcut.dragging');
-  if (!draggingEl) return;
-  const afterElement = getDragAfterElement(pinnedShortcutsGroup, e.clientY, '.pinned-shortcut');
-  if (afterElement == null) {
-    pinnedShortcutsGroup.appendChild(draggingEl);
-  } else {
-    pinnedShortcutsGroup.insertBefore(draggingEl, afterElement);
-  }
-});
-
-// Init pinned shortcuts on load
-(async () => {
-  const pinned = await store.get('pinnedShortcuts', []);
-  renderPinnedToolbar(pinned);
-  syncPinBtn(pinned.length);
-})();
-
-// ---------- Google Search Bar (enhanced) ----------
-(function () {
-  const searchBarInput   = document.getElementById('searchBarInput');
-  const searchBarWrapper = document.getElementById('searchBarWrapper');
-  const suggestionsBox   = document.getElementById('searchSuggestions');
-  if (!searchBarInput) return;
-
-  const HISTORY_KEY  = 'searchHistory';
-  const MAX_HISTORY  = 5;
-  const URL_PATTERN  = /^(https?:\/\/|ftp:\/\/|\S+\.\S{2,}(\/\S*)?$)/i;
-
-  let focusedIdx   = -1;   // keyboard nav index in suggestions
-  let currentItems = [];   // flat list of rendered suggestion elements
-  let debounceTimer = null;
-
-  // ── helpers ──────────────────────────────────────────────────
-  async function getHistory() {
-    return store.get(HISTORY_KEY, []);
-  }
-
-  async function addToHistory(query) {
-    let hist = await getHistory();
-    hist = hist.filter(h => h !== query);
-    hist.unshift(query);
-    if (hist.length > MAX_HISTORY) hist = hist.slice(0, MAX_HISTORY);
-    store.set(HISTORY_KEY, hist);
-  }
-
-  async function deleteHistoryEntry(query) {
-    let hist = await getHistory();
-    hist = hist.filter(h => h !== query);
-    store.set(HISTORY_KEY, hist);
-    // Re-render suggestions with the current input value
-    await renderSuggestions(searchBarInput.value.trim());
-  }
-
-  function isUrl(text) {
-    return URL_PATTERN.test(text.trim());
-  }
-
-  function normaliseUrl(text) {
-    const t = text.trim();
-    if (/^https?:\/\//i.test(t)) return t;
-    return 'https://' + t;
-  }
-
-  function navigate(target) {
-    if (window.chrome && chrome.tabs) {
-      chrome.tabs.getCurrent(tab => chrome.tabs.update(tab.id, { url: target }));
-    } else {
-      window.location.href = target;
-    }
-  }
-
-  function googleSearch(query) {
-    navigate(`https://www.google.com/search?q=${encodeURIComponent(query)}`);
-  }
-
-  // ── spotlight (active) state ──────────────────────────────────
-  function setActive(on) {
-    searchBarWrapper.classList.toggle('active', on);
-  }
-
-  // ── Google autocomplete (fetch-based, CSP-compliant for MV3) ──
-  function fetchGoogleSuggestions(query) {
-    // Use client=firefox to get a plain JSON array response (no JSONP needed).
-    // This avoids dynamic <script> injection which is blocked by MV3 CSP.
-    const url = `https://suggestqueries.google.com/complete/search?client=firefox&q=${encodeURIComponent(query)}`;
-    return fetch(url)
-      .then(r => r.json())
-      .then(data => {
-        // Response format: [query, [suggestions]]
-        return Array.isArray(data) && Array.isArray(data[1]) ? data[1].slice(0, 6) : [];
-      })
-      .catch(() => []);
-  }
-
-  // ── render suggestions ────────────────────────────────────────
-  function svgIcon(path, size = 14) {
-    return `<svg viewBox="0 0 24 24" width="${size}" height="${size}" fill="none" stroke="currentColor" stroke-width="1.8">${path}</svg>`;
-  }
-
-  const ICON_HISTORY  = svgIcon('<path d="M12 8v4l3 3"/><circle cx="12" cy="12" r="9"/>');
-  const ICON_SEARCH   = svgIcon('<circle cx="11" cy="11" r="7"/><path d="M21 21l-4.35-4.35"/>');
-  const ICON_NAVIGATE = svgIcon('<path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/>');
-
-  function highlightMatch(text, query) {
-    if (!query) return document.createTextNode(text);
-    const idx = text.toLowerCase().indexOf(query.toLowerCase());
-    if (idx === -1) return document.createTextNode(text);
-    const span = document.createElement('span');
-    span.className = 'suggestion-text';
-    span.innerHTML =
-      escapeHtml(text.slice(0, idx)) +
-      `<mark>${escapeHtml(text.slice(idx, idx + query.length))}</mark>` +
-      escapeHtml(text.slice(idx + query.length));
-    return span;
-  }
-
-  function escapeHtml(str) {
-    return str.replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-  }
-
-  function buildItem({ icon, label, query, badge, onActivate }) {
-    const div = document.createElement('div');
-    div.className = 'suggestion-item';
-    div.setAttribute('role', 'option');
-    div.tabIndex = -1;
-
-    const iconEl = document.createElement('span');
-    iconEl.className = 'suggestion-icon';
-    iconEl.innerHTML = icon;
-
-    const textEl = document.createElement('span');
-    textEl.className = 'suggestion-text';
-
-    const hl = highlightMatch(label, query);
-    if (hl instanceof Node) {
-      if (hl.nodeType === Node.TEXT_NODE) {
-        textEl.textContent = label;
-      } else {
-        textEl.innerHTML = hl.innerHTML;
-      }
-    }
-
-    div.appendChild(iconEl);
-    div.appendChild(textEl);
-
-    if (badge) {
-      const b = document.createElement('span');
-      b.className = 'suggestion-type-badge';
-      b.textContent = badge;
-      div.appendChild(b);
-    }
-
-    div.addEventListener('mousedown', (e) => {
-      e.preventDefault(); // prevent blur before click
-      onActivate();
-    });
-
-    return div;
-  }
-
-  // History item = regular item + a × delete button
-  function buildHistoryItem({ label, query, onActivate }) {
-    const div = buildItem({ icon: ICON_HISTORY, label, query, onActivate });
-
-    const del = document.createElement('button');
-    del.className = 'suggestion-delete-btn';
-    del.setAttribute('aria-label', 'Remove from history');
-    del.innerHTML = '<svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>';
-    del.addEventListener('mousedown', (e) => {
-      e.preventDefault();
-      e.stopPropagation(); // don't trigger the item's onActivate
-      deleteHistoryEntry(label);
-    });
-
-    div.appendChild(del);
-    return div;
-  }
-
-  function sectionLabel(text) {
-    const el = document.createElement('div');
-    el.className = 'suggestion-section-label';
-    el.textContent = text;
-    return el;
-  }
-
-  async function renderSuggestions(query) {
-    suggestionsBox.innerHTML = '';
-    focusedIdx = -1;
-    currentItems = [];
-
-    if (!query) {
-      // Show recent history
-      const hist = await getHistory();
-      if (hist.length === 0) { hideSuggestions(); return; }
-      suggestionsBox.appendChild(sectionLabel('Recent'));
-      hist.forEach(h => {
-        const item = buildHistoryItem({
-          label: h,
-          query: '',
-          onActivate: () => commitQuery(h)
-        });
-        suggestionsBox.appendChild(item);
-        currentItems.push(item);
-      });
-      showSuggestions();
-      return;
-    }
-
-    // Detect URL
-    const looksLikeUrl = isUrl(query);
-
-    // Always offer the direct action first
-    if (looksLikeUrl) {
-      const item = buildItem({
-        icon: ICON_NAVIGATE,
-        label: query,
-        query,
-        badge: 'Go to site',
-        onActivate: () => { addToHistory(query); navigate(normaliseUrl(query)); }
-      });
-      suggestionsBox.appendChild(item);
-      currentItems.push(item);
-    } else {
-      const item = buildItem({
-        icon: ICON_SEARCH,
-        label: `Search: ${query}`,
-        query,
-        badge: 'Google',
-        onActivate: () => commitQuery(query)
-      });
-      suggestionsBox.appendChild(item);
-      currentItems.push(item);
-    }
-
-    showSuggestions();
-
-    // History matches
-    const hist = await getHistory();
-    const histMatches = hist.filter(h => h.toLowerCase().includes(query.toLowerCase()) && h !== query);
-    if (histMatches.length) {
-      suggestionsBox.appendChild(sectionLabel('Recent'));
-      histMatches.slice(0, 3).forEach(h => {
-        const item = buildHistoryItem({
-          label: h,
-          query,
-          onActivate: () => commitQuery(h)
-        });
-        suggestionsBox.appendChild(item);
-        currentItems.push(item);
-      });
-    }
-
-    // Google suggestions (async — append when ready)
-    if (!looksLikeUrl) {
-      // Capture a snapshot of currentItems so we only append if the
-      // suggestions box hasn't been reset by a newer renderSuggestions call.
-      const itemsAtDispatch = currentItems;
-      fetchGoogleSuggestions(query).then(suggestions => {
-        // Only show if the input hasn't changed AND this render is still active
-        if (searchBarInput.value.trim() !== query) return;
-        if (currentItems !== itemsAtDispatch) return;
-        const newSuggestions = suggestions.filter(s => s !== query);
-        if (!newSuggestions.length) return;
-
-        const label = sectionLabel('Suggestions');
-        suggestionsBox.appendChild(label);
-
-        newSuggestions.forEach(s => {
-          const item = buildItem({
-            icon: ICON_SEARCH,
-            label: s,
-            query,
-            onActivate: () => commitQuery(s)
-          });
-          suggestionsBox.appendChild(item);
-          currentItems.push(item);
-        });
-      });
-    }
-  }
-
-  function showSuggestions() {
-    suggestionsBox.classList.add('visible');
-  }
-
-  function hideSuggestions() {
-    suggestionsBox.classList.remove('visible');
-    suggestionsBox.innerHTML = '';
-    focusedIdx = -1;
-    currentItems = [];
-  }
-
-  function commitQuery(text) {
-    const t = text.trim();
-    if (!t) return;
-    if (isUrl(t)) {
-      addToHistory(t);
-      navigate(normaliseUrl(t));
-    } else {
-      addToHistory(t);
-      googleSearch(t);
-    }
-  }
-
-  // ── keyboard navigation ───────────────────────────────────────
-  function moveFocus(delta) {
-    const items = suggestionsBox.querySelectorAll('.suggestion-item');
-    if (!items.length) return;
-    items.forEach(el => el.classList.remove('focused'));
-    // When starting from -1 and going up, jump straight to the last item
-    if (focusedIdx === -1 && delta === -1) {
-      focusedIdx = items.length - 1;
-    } else {
-      focusedIdx = (focusedIdx + delta + items.length) % items.length;
-    }
-    items[focusedIdx].classList.add('focused');
-    // Fill input with the hovered suggestion text
-    const labelEl = items[focusedIdx].querySelector('.suggestion-text');
-    if (labelEl) {
-      const raw = labelEl.textContent.replace(/^Search:\s/, '');
-      searchBarInput.value = raw;
-    }
-  }
-
-  searchBarInput.addEventListener('keydown', (e) => {
-    if (e.key === 'ArrowDown') { e.preventDefault(); moveFocus(1); return; }
-    if (e.key === 'ArrowUp')   { e.preventDefault(); moveFocus(-1); return; }
-
-    if (e.key === 'Enter') {
-      e.preventDefault();
-      const focused = suggestionsBox.querySelector('.suggestion-item.focused');
-      if (focused) {
-        focused.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }));
-      } else {
-        const q = searchBarInput.value.trim();
-        if (q) commitQuery(q);
-      }
-      return;
-    }
-
-    if (e.key === 'Escape') {
-      hideSuggestions();
-      searchBarInput.blur();
-    }
-  });
-
-  // ── input handler (debounced) ─────────────────────────────────
-  searchBarInput.addEventListener('input', () => {
-    clearTimeout(debounceTimer);
-    debounceTimer = setTimeout(() => {
-      renderSuggestions(searchBarInput.value.trim());
-    }, 160);
-  });
-
-  // ── focus / blur ──────────────────────────────────────────────
-  searchBarInput.addEventListener('focus', async () => {
-    setActive(true);
-    await renderSuggestions(searchBarInput.value.trim());
-  });
-
-  searchBarInput.addEventListener('blur', () => {
-    // Delay so mousedown on a suggestion fires first
-    setTimeout(() => {
-      setActive(false);
-      hideSuggestions();
-    }, 180);
-  });
-
-  // ── Ctrl+G shortcut ───────────────────────────────────────────
-  document.addEventListener('keydown', (e) => {
-    if (e.ctrlKey && e.key === 'g') {
-      const active = document.activeElement;
-      const tag = active ? active.tagName : '';
-      if (tag === 'INPUT' && active !== searchBarInput) return;
-      if (tag === 'TEXTAREA') return;
-      e.preventDefault();
-      searchBarInput.focus();
-      searchBarInput.select();
-    }
-  });
-})();
-
 
 // ══════════════════════════════════════════════════════════════
 // Welcome Overlay — show only on first install
 // ══════════════════════════════════════════════════════════════
-(async function initWelcome() {
-  const overlay  = document.getElementById('welcomeOverlay');
-  const dismissBtn = document.getElementById('welcomeDismiss');
-  if (!overlay || !dismissBtn) return;
+// ---------- Focus Mode ----------
+const clockEl = document.querySelector('.clock');
+const dateEl = document.getElementById('date');
+const focusNotification = document.getElementById('focusNotification');
 
-  // Check if the user has already been welcomed
-  const welcomed = await store.get('welcomed', false);
-  if (welcomed) return; // not first install — do nothing
+let focusTimeout = null;
+function showFocusNotification(text) {
+  focusNotification.textContent = text;
+  focusNotification.classList.add('visible');
+  focusTimeout = setTimeout(() => {
+    focusNotification.classList.remove('visible');
+  }, 1500);
+}
 
-  // First install: reveal the overlay
-  // Use rAF to ensure the CSS transition fires properly after display
-  requestAnimationFrame(() => {
-    overlay.classList.add('visible');
+async function toggleFocusMode(e) {
+  // If it's a double click event, ignore if clicking inside interactive widgets or the timer time
+  if (e && e.type === 'dblclick') {
+    if (e.target.closest('.photo') || e.target.closest('.right-panel') || e.target.closest('.vertical-toolbar') || e.target.closest('.bookmarks-drawer') || e.target.closest('#bgSettingsDrawer') || e.target.closest('#helpDrawer') || e.target.closest('#timerTime')) return;
+  }
+  
+  document.body.classList.toggle('focus-mode');
+  const isFocus = document.body.classList.contains('focus-mode');
+  await store.set('focusMode', isFocus);
+  showFocusNotification(isFocus ? "Focus Mode Active" : "All Widgets Visible");
+  
+  if (!isFocus) {
+    document.body.classList.remove('timer-flash-active');
+  }
+}
+
+document.addEventListener('dblclick', toggleFocusMode);
+
+// Keyboard Esc shortcut
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape') {
+    // Avoid toggling Focus Mode if user is inside an input field or textarea
+    const activeEl = document.activeElement;
+    if (activeEl && (activeEl.tagName === 'INPUT' || activeEl.tagName === 'TEXTAREA' || activeEl.isContentEditable)) {
+      return;
+    }
+    
+    // Close drawers first if open
+    let drawerClosed = false;
+    [bookmarksDrawer, bgSettingsDrawer, helpDrawer].forEach(drawer => {
+      if (drawer && drawer.classList.contains('open')) {
+        drawer.classList.remove('open');
+        drawerClosed = true;
+      }
+    });
+    
+    // If we closed a drawer, let Escape close the drawer first (do not toggle focus mode)
+    if (drawerClosed) return;
+    
+    toggleFocusMode();
+  }
+});
+
+async function initFocusMode() {
+  const active = await store.get('focusMode', false);
+  if (active) {
+    document.body.classList.add('focus-mode');
+  }
+  await initTimer();
+}
+
+// ══════════════════════════════════════════════════════════════
+// Focus Countdown Timer with Web Audio Chime & State Syncing
+// ══════════════════════════════════════════════════════════════
+
+const timerView = document.getElementById('timerView');
+const timerTime = document.getElementById('timerTime');
+const timerInput = document.getElementById('timerInput');
+const timerDoneBtn = document.getElementById('timerDoneBtn');
+
+let timerInterval = null;
+let defaultDurationMin = 25;
+let timerState = 'idle'; // 'idle', 'running', 'paused', 'finished'
+let timerEndTimestamp = 0;
+let timerRemainingMs = 25 * 60 * 1000;
+let timerSoundEnabled = true;
+
+// Update keyboard shortcuts guide string visually to show Sound mute state
+function updateShortcutsGuideUI() {
+  const guide = document.getElementById('timerShortcutsHelp');
+  if (!guide) return;
+  if (timerSoundEnabled) {
+    guide.textContent = "[Space] Play/Pause  •  [R] Reset  •  [M] Mute";
+  } else {
+    guide.textContent = "[Space] Play/Pause  •  [R] Reset  •  [M] Unmute";
+  }
+}
+
+// Request Desktop Notification Permission
+function requestNotificationPermission() {
+  if (window.Notification && Notification.permission === 'default') {
+    Notification.requestPermission();
+  }
+}
+
+// Desktop Notification Trigger
+function showDesktopNotification() {
+  if (window.Notification && Notification.permission === 'granted') {
+    try {
+      new Notification("Flash Dash", {
+        body: "Time is up! Great focus session. ⚡",
+        icon: "icons/icon128.png"
+      });
+    } catch (e) {
+      console.error("Desktop notification failed to show:", e);
+    }
+  }
+}
+
+// Optical dimness overlay updater based on timer running states
+async function applyDimnessState() {
+  const baseDim = parseInt(await store.get('bgDim', 0));
+  const extraDim = (timerState === 'running') ? 15 : 0;
+  const finalDim = Math.min(100, baseDim + extraDim);
+  const screenBgOverlay = document.getElementById('screenBgOverlay');
+  if (screenBgOverlay) {
+    screenBgOverlay.style.opacity = finalDim / 100;
+  }
+}
+
+function playPremiumChime() {
+  try {
+    const AudioContext = window.AudioContext || window.webkitAudioContext;
+    if (!AudioContext) return;
+    const ctx = new AudioContext();
+    const now = ctx.currentTime;
+    
+    // Warm bell chime synthesis (fundamental C5 + harmonic G5 + C6 harmonics)
+    const osc1 = ctx.createOscillator();
+    const gain1 = ctx.createGain();
+    osc1.type = 'sine';
+    osc1.frequency.setValueAtTime(523.25, now); // C5
+    gain1.gain.setValueAtTime(0.3, now);
+    gain1.gain.exponentialRampToValueAtTime(0.001, now + 2.5);
+    
+    const osc2 = ctx.createOscillator();
+    const gain2 = ctx.createGain();
+    osc2.type = 'sine';
+    osc2.frequency.setValueAtTime(783.99, now); // G5
+    gain2.gain.setValueAtTime(0.15, now);
+    gain2.gain.exponentialRampToValueAtTime(0.001, now + 1.8);
+    
+    const osc3 = ctx.createOscillator();
+    const gain3 = ctx.createGain();
+    osc3.type = 'sine';
+    osc3.frequency.setValueAtTime(1046.50, now); // C6
+    gain3.gain.setValueAtTime(0.1, now);
+    gain3.gain.exponentialRampToValueAtTime(0.001, now + 1.2);
+    
+    osc1.connect(gain1);
+    gain1.connect(ctx.destination);
+    osc2.connect(gain2);
+    gain2.connect(ctx.destination);
+    osc3.connect(gain3);
+    gain3.connect(ctx.destination);
+    
+    osc1.start(now);
+    osc1.stop(now + 2.5);
+    osc2.start(now);
+    osc2.stop(now + 1.8);
+    osc3.start(now);
+    osc3.stop(now + 1.2);
+  } catch (e) {
+    console.error("Audio Context chime failed:", e);
+  }
+}
+
+function updateTimerDisplay(ms) {
+  if (ms < 0) ms = 0;
+  const totalSec = Math.ceil(ms / 1000);
+  const min = Math.floor(totalSec / 60);
+  const sec = totalSec % 60;
+  timerTime.textContent = `${min.toString().padStart(2, '0')}:${sec.toString().padStart(2, '0')}`;
+}
+
+async function startTimer(durationMs) {
+  requestNotificationPermission();
+  timerState = 'running';
+  timerEndTimestamp = Date.now() + durationMs;
+  await store.set('focusTimerState', 'running');
+  await store.set('focusTimerEndTimestamp', timerEndTimestamp);
+  
+  document.body.classList.add('timer-running');
+  if (timerView) timerView.className = 'timer-view running';
+  
+  await applyDimnessState();
+  runTimerLoop();
+}
+
+function runTimerLoop() {
+  if (timerInterval) clearInterval(timerInterval);
+  updateTimerLoop();
+  timerInterval = setInterval(updateTimerLoop, 200);
+}
+
+async function updateTimerLoop() {
+  if (timerState !== 'running') {
+    if (timerInterval) clearInterval(timerInterval);
+    return;
+  }
+  
+  const remaining = timerEndTimestamp - Date.now();
+  if (remaining <= 0) {
+    if (timerInterval) clearInterval(timerInterval);
+    timerState = 'finished';
+    timerRemainingMs = 0;
+    updateTimerDisplay(0);
+    await store.set('focusTimerState', 'finished');
+    
+    document.body.classList.remove('timer-running');
+    if (timerView) timerView.className = 'timer-view finished';
+    document.body.classList.add('timer-flash-active');
+    
+    await applyDimnessState();
+    
+    if (timerSoundEnabled) {
+      playPremiumChime();
+    }
+    showDesktopNotification();
+  } else {
+    timerRemainingMs = remaining;
+    updateTimerDisplay(remaining);
+  }
+}
+
+async function pauseTimer() {
+  if (timerInterval) clearInterval(timerInterval);
+  timerState = 'paused';
+  await store.set('focusTimerState', 'paused');
+  await store.set('focusTimerRemaining', timerRemainingMs);
+  
+  document.body.classList.remove('timer-running');
+  if (timerView) timerView.className = 'timer-view paused';
+  
+  await applyDimnessState();
+}
+
+async function resetTimer() {
+  if (timerInterval) clearInterval(timerInterval);
+  timerState = 'idle';
+  document.body.classList.remove('timer-flash-active');
+  document.body.classList.remove('timer-running');
+  
+  const durationMin = await store.get('focusTimerDuration', defaultDurationMin);
+  timerRemainingMs = durationMin * 60 * 1000;
+  updateTimerDisplay(timerRemainingMs);
+  
+  await store.set('focusTimerState', 'idle');
+  await store.set('focusTimerRemaining', timerRemainingMs);
+  
+  if (timerView) timerView.className = 'timer-view paused';
+  
+  await applyDimnessState();
+}
+
+async function initTimer() {
+  if (!timerView) return;
+  timerSoundEnabled = await store.get('focusTimerSoundEnabled', true);
+  updateShortcutsGuideUI();
+  
+  const durationMin = await store.get('focusTimerDuration', defaultDurationMin);
+  timerState = await store.get('focusTimerState', 'idle');
+  timerRemainingMs = durationMin * 60 * 1000;
+  
+  document.body.classList.remove('timer-flash-active');
+  document.body.classList.remove('timer-running');
+  
+  if (timerState === 'running') {
+    timerEndTimestamp = await store.get('focusTimerEndTimestamp', 0);
+    const remaining = timerEndTimestamp - Date.now();
+    if (remaining <= 0) {
+      timerState = 'finished';
+      timerRemainingMs = 0;
+      updateTimerDisplay(0);
+      timerView.className = 'timer-view finished';
+      document.body.classList.add('timer-flash-active');
+    } else {
+      timerRemainingMs = remaining;
+      updateTimerDisplay(remaining);
+      timerView.className = 'timer-view running';
+      document.body.classList.add('timer-running');
+      runTimerLoop();
+    }
+  } else if (timerState === 'paused') {
+    timerRemainingMs = await store.get('focusTimerRemaining', durationMin * 60 * 1000);
+    updateTimerDisplay(timerRemainingMs);
+    timerView.className = 'timer-view paused';
+  } else if (timerState === 'finished') {
+    updateTimerDisplay(0);
+    timerView.className = 'timer-view finished';
+    document.body.classList.add('timer-flash-active');
+  } else {
+    updateTimerDisplay(timerRemainingMs);
+    timerView.className = 'timer-view paused';
+  }
+  
+  await applyDimnessState();
+}
+
+// Controls interactions
+if (timerTime) {
+  timerTime.addEventListener('click', (e) => {
+    if (timerState === 'finished') return;
+    if (timerView.classList.contains('editing')) return;
+    
+    if (timerState === 'running') {
+      pauseTimer();
+    } else {
+      // Enter Edit mode if clicked when paused or idle
+      enterTimerEditMode();
+    }
+  });
+}
+
+function enterTimerEditMode() {
+  if (!timerView || !timerInput) return;
+  timerView.classList.add('editing');
+  
+  const currentDurationMin = Math.round(timerRemainingMs / (60 * 1000));
+  timerInput.value = currentDurationMin;
+  timerInput.focus();
+  timerInput.select();
+}
+
+async function saveTimerEditMode() {
+  if (!timerView || !timerInput) return;
+  timerView.classList.remove('editing');
+  
+  let val = parseInt(timerInput.value.trim());
+  if (isNaN(val) || val <= 0) {
+    val = defaultDurationMin;
+  }
+  val = Math.min(999, val); // clamp to max 999 mins
+  
+  await store.set('focusTimerDuration', val);
+  timerRemainingMs = val * 60 * 1000;
+  updateTimerDisplay(timerRemainingMs);
+  
+  await store.set('focusTimerState', 'idle');
+  await store.set('focusTimerRemaining', timerRemainingMs);
+  
+  timerState = 'idle';
+  timerView.className = 'timer-view paused';
+}
+
+if (timerInput) {
+  timerInput.addEventListener('keydown', async (e) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      await saveTimerEditMode();
+    } else if (e.key === 'Escape') {
+      e.preventDefault();
+      timerView.classList.remove('editing');
+    }
+  });
+  
+  timerInput.addEventListener('blur', async () => {
+    await saveTimerEditMode();
+  });
+}
+
+
+
+if (timerDoneBtn) {
+  timerDoneBtn.addEventListener('click', async (e) => {
+    e.stopPropagation();
+    document.body.classList.remove('timer-flash-active');
+    await resetTimer();
+    toggleFocusMode();
+  });
+}
+
+// Global Spacebar and R Key listener (when not inside inputs)
+document.addEventListener('keydown', (e) => {
+  // Only capture keypresses in Focus Mode
+  if (!document.body.classList.contains('focus-mode')) return;
+  
+  // Ignore if inside input/textarea/editable
+  const activeEl = document.activeElement;
+  if (activeEl && (activeEl.tagName === 'INPUT' || activeEl.tagName === 'TEXTAREA' || activeEl.isContentEditable)) {
+    return;
+  }
+  
+  if (e.key === ' ') {
+    e.preventDefault(); // prevent page scroll
+    
+    if (timerState === 'finished') return;
+    
+    if (timerState === 'running') {
+      pauseTimer();
+    } else {
+      startTimer(timerRemainingMs);
+    }
+  } else if (e.key === 'r' || e.key === 'R') {
+    e.preventDefault();
+    resetTimer();
+  } else if (e.key === 'm' || e.key === 'M') {
+    e.preventDefault();
+    timerSoundEnabled = !timerSoundEnabled;
+    await store.set('focusTimerSoundEnabled', timerSoundEnabled);
+    updateShortcutsGuideUI();
+  }
+});
+
+// Sync Timer state across multiple tabs
+if (window.chrome && chrome.storage && chrome.storage.onChanged) {
+  chrome.storage.onChanged.addListener(async (changes, namespace) => {
+    if (namespace === 'local') {
+      if (changes.focusTimerState || changes.focusTimerDuration || changes.focusTimerEndTimestamp || changes.focusTimerRemaining) {
+        await initTimer();
+      }
+      if (changes.focusTimerSoundEnabled) {
+        timerSoundEnabled = changes.focusTimerSoundEnabled.newValue;
+        updateShortcutsGuideUI();
+      }
+      if (changes.focusMode) {
+        const active = changes.focusMode.newValue;
+        if (active) {
+          document.body.classList.add('focus-mode');
+        } else {
+          document.body.classList.remove('focus-mode');
+          document.body.classList.remove('timer-flash-active');
+        }
+      }
+    }
+  });
+}
+const ghostGrid = document.getElementById('ghostGrid');
+
+async function loadShortcuts() {
+  const defaultShortcuts = [
+    { title: "Google", url: "https://google.com" },
+    { title: "GitHub", url: "https://github.com" },
+    { title: "YouTube", url: "https://youtube.com" }
+  ];
+  const list = await store.get('shortcuts', defaultShortcuts);
+  renderShortcuts(list);
+}
+
+function renderShortcuts(shortcuts) {
+  if (!ghostGrid) return;
+  ghostGrid.innerHTML = '';
+
+  shortcuts.forEach((sc, idx) => {
+    const item = document.createElement('a');
+    item.className = 'shortcut-item';
+    item.href = sc.url;
+    item.title = sc.title;
+
+    item.addEventListener('click', (e) => {
+      if (e.metaKey || e.ctrlKey || e.button === 1) {
+        return; // default new tab behavior
+      }
+      e.preventDefault();
+      window.location.href = sc.url;
+    });
+
+    const tile = document.createElement('div');
+    tile.className = 'shortcut-tile';
+
+    const img = document.createElement('img');
+    img.className = 'shortcut-icon';
+    img.src = faviconUrl(sc.url);
+    img.alt = '';
+    
+    img.onerror = () => {
+      img.remove();
+      const fallback = document.createElement('div');
+      fallback.className = 'shortcut-fallback';
+      fallback.textContent = sc.title ? sc.title.slice(0, 1).toUpperCase() : 'S';
+      tile.appendChild(fallback);
+    };
+    
+    tile.appendChild(img);
+
+    const del = document.createElement('span');
+    del.className = 'shortcut-del';
+    del.innerHTML = '&times;';
+    del.title = 'Delete Shortcut';
+    del.addEventListener('click', async (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      const confirmed = confirm(`Delete shortcut for ${sc.title}?`);
+      if (!confirmed) return;
+      const current = await store.get('shortcuts', []);
+      current.splice(idx, 1);
+      await store.set('shortcuts', current);
+      renderShortcuts(current);
+    });
+    tile.appendChild(del);
+
+    item.appendChild(tile);
+
+    const label = document.createElement('span');
+    label.className = 'shortcut-label';
+    label.textContent = sc.title;
+    item.appendChild(label);
+
+    ghostGrid.appendChild(item);
   });
 
-  // "Get Started" — animate out, then hide & persist the flag
-  dismissBtn.addEventListener('click', async () => {
-    // Immediately cut pointer-events so double-clicks can't fire
-    overlay.style.pointerEvents = 'none';
-    overlay.classList.add('dismissing');
-    await store.set('welcomed', true);
-    // Wait for the CSS transition to finish before fully hiding
-    overlay.addEventListener('transitionend', () => {
-      overlay.style.display = 'none';
-    }, { once: true });
-    // Fallback: hide after 450 ms even if transitionend never fires
-    setTimeout(() => { overlay.style.display = 'none'; }, 450);
-  });
-})();
+  if (shortcuts.length < 8) {
+    const addBtn = document.createElement('div');
+    addBtn.className = 'shortcut-item add-shortcut-btn';
+    addBtn.setAttribute('tabindex', '0');
+    addBtn.setAttribute('role', 'button');
+    addBtn.setAttribute('aria-label', 'Add Shortcut');
+
+    const tile = document.createElement('div');
+    tile.className = 'shortcut-tile';
+    tile.innerHTML = '<span style="font-size: 18px; font-weight: 500;">+</span>';
+    addBtn.appendChild(tile);
+
+    const label = document.createElement('span');
+    label.className = 'shortcut-label';
+    label.textContent = 'Add shortcut';
+    addBtn.appendChild(label);
+
+    const triggerAdd = async () => {
+      const title = prompt("Enter shortcut name (max 15 chars):");
+      if (!title) return;
+      let url = prompt("Enter URL (e.g. google.com):");
+      if (!url) return;
+      
+      url = url.trim();
+      if (!/^https?:\/\//i.test(url)) {
+        url = 'https://' + url;
+      }
+      
+      const current = await store.get('shortcuts', []);
+      current.push({ title: title.slice(0, 15), url });
+      await store.set('shortcuts', current);
+      renderShortcuts(current);
+    };
+
+    addBtn.addEventListener('click', triggerAdd);
+    addBtn.addEventListener('keydown', (e) => {
+      if (e.key === ' ' || e.key === 'Enter') {
+        e.preventDefault();
+        triggerAdd();
+      }
+    });
+
+    ghostGrid.appendChild(addBtn);
+  }
+}
+
+// ---------- whiteboard lock ----------
+const lockBoardBtn = document.getElementById('lockBoardBtn');
+const lockIcon = document.getElementById('lockIcon');
+let boardIsLocked = false;
+
+async function applyLockState(locked) {
+  boardIsLocked = locked;
+  const boardEl = document.getElementById('board');
+  if (locked) {
+    boardEl.classList.add('board-locked');
+    lockBoardBtn.classList.add('active');
+    // Closed shackle SVG path
+    lockIcon.innerHTML = '<rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>';
+  } else {
+    boardEl.classList.remove('board-locked');
+    lockBoardBtn.classList.remove('active');
+    // Open shackle SVG path
+    lockIcon.innerHTML = '<rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 9.9-1"/>';
+  }
+}
+
+async function initLockState() {
+  const locked = await store.get('boardLocked', false);
+  applyLockState(locked);
+}
+initLockState();
+
+lockBoardBtn.addEventListener('click', async () => {
+  const next = !boardIsLocked;
+  applyLockState(next);
+  await store.set('boardLocked', next);
+});
+
+// ---------- Screen-Wide Background Feature ----------
+const bgSettingsToggleBtn = document.getElementById('bgSettingsToggleBtn');
+const bgSettingsDrawer = document.getElementById('bgSettingsDrawer');
+const closeBgSettings = document.getElementById('closeBgSettings');
+const bgDropZone = document.getElementById('bgDropZone');
+const bgFileInput = document.getElementById('bgFileInput');
+const bgDimSlider = document.getElementById('bgDimSlider');
+const bgDimValue = document.getElementById('bgDimValue');
+const bgBlurSlider = document.getElementById('bgBlurSlider');
+const bgBlurValue = document.getElementById('bgBlurValue');
+const clearBgBtn = document.getElementById('clearBgBtn');
+const screenBgContainer = document.getElementById('screenBgContainer');
+const screenBgOverlay = document.getElementById('screenBgOverlay');
+
+// Toggle background drawer
+bgSettingsToggleBtn.addEventListener('click', () => {
+  bookmarksDrawer.classList.remove('open');
+  bgSettingsDrawer.classList.toggle('open');
+});
+
+// Close background drawer
+closeBgSettings.addEventListener('click', () => {
+  bgSettingsDrawer.classList.remove('open');
+});
+
+// Trigger file selection on drop zone click
+bgDropZone.addEventListener('click', () => {
+  bgFileInput.click();
+});
+
+// Handle drop zone file drag and drop events
+bgDropZone.addEventListener('dragenter', (e) => {
+  e.preventDefault();
+  e.stopPropagation();
+  bgDropZone.classList.add('dragover');
+});
+
+bgDropZone.addEventListener('dragover', (e) => {
+  e.preventDefault();
+  e.stopPropagation();
+  bgDropZone.classList.add('dragover');
+});
+
+bgDropZone.addEventListener('dragleave', (e) => {
+  e.preventDefault();
+  e.stopPropagation();
+  bgDropZone.classList.remove('dragover');
+});
+
+bgDropZone.addEventListener('drop', async (e) => {
+  e.preventDefault();
+  e.stopPropagation();
+  bgDropZone.classList.remove('dragover');
+
+  const files = [...e.dataTransfer.files];
+  if (files.length > 0) {
+    await processAndSetBackground(files[0]);
+  }
+});
+
+// Handle file input change
+bgFileInput.addEventListener('change', async (e) => {
+  const files = [...e.target.files];
+  if (files.length > 0) {
+    await processAndSetBackground(files[0]);
+  }
+  bgFileInput.value = '';
+});
+
+// Process image file to data URL and set background
+async function processAndSetBackground(file) {
+  if (!file.type.startsWith('image/')) return;
+  
+  // Store the Blob directly in IndexedDB
+  await largeStore.set('bgImage', file);
+  await store.set('bgImage', 'MIGRATED'); // Sentinel for migration detection
+  applyBgImage(file);
+}
+
+// Apply background image to container
+let bgObjectUrl = null;
+function applyBgImage(src) {
+  if (bgObjectUrl) {
+    URL.revokeObjectURL(bgObjectUrl);
+    bgObjectUrl = null;
+  }
+  if (src) {
+    if (src instanceof Blob) {
+      bgObjectUrl = URL.createObjectURL(src);
+      screenBgContainer.style.backgroundImage = `url(${bgObjectUrl})`;
+    } else {
+      // Legacy base64 string
+      screenBgContainer.style.backgroundImage = `url(${src})`;
+    }
+    clearBgBtn.removeAttribute('disabled');
+  } else {
+    screenBgContainer.style.backgroundImage = 'none';
+    clearBgBtn.setAttribute('disabled', 'true');
+  }
+}
+
+// Handle dim/opacity slider
+bgDimSlider.addEventListener('input', (e) => {
+  const val = e.target.value;
+  bgDimValue.textContent = `${val}%`;
+  const extraDim = (typeof timerState !== 'undefined' && timerState === 'running') ? 15 : 0;
+  const finalDim = Math.min(100, parseInt(val) + extraDim);
+  if (screenBgOverlay) {
+    screenBgOverlay.style.opacity = finalDim / 100;
+  }
+});
+
+bgDimSlider.addEventListener('change', async (e) => {
+  await store.set('bgDim', e.target.value);
+});
+
+// Handle blur slider
+bgBlurSlider.addEventListener('input', async (e) => {
+  const val = e.target.value;
+  bgBlurValue.textContent = `${val}px`;
+  screenBgContainer.style.filter = val > 0 ? `blur(${val}px)` : 'none';
+});
+
+bgBlurSlider.addEventListener('change', async (e) => {
+  await store.set('bgBlur', e.target.value);
+});
+
+// Handle clear background button
+clearBgBtn.addEventListener('click', async () => {
+  const confirmed = confirm('Remove the screen background?');
+  if (!confirmed) return;
+
+  await store.set('bgImage', null);
+  await largeStore.delete('bgImage');
+  await store.set('bgDim', 0);
+  await store.set('bgBlur', 0);
+
+  applyBgImage(null);
+  
+  bgDimSlider.value = 0;
+  bgDimValue.textContent = '0%';
+  screenBgOverlay.style.opacity = 0;
+
+  bgBlurSlider.value = 0;
+  bgBlurValue.textContent = '0px';
+  screenBgContainer.style.filter = 'none';
+});
+
+// Initialize background settings from storage
+async function initBackground() {
+  let src = await store.get('bgImage', null);
+  
+  if (src === 'MIGRATED') {
+    src = await largeStore.get('bgImage', null);
+  } else if (src && typeof src === 'string' && src.startsWith('data:')) {
+    // Perform migration if we hit base64 string from legacy
+    const blob = dataURLtoBlob(src);
+    if (blob) {
+      await largeStore.set('bgImage', blob);
+      await store.set('bgImage', 'MIGRATED');
+      src = blob;
+    }
+  }
+
+  const dim = await store.get('bgDim', 0);
+  const blur = await store.get('bgBlur', 0);
+
+  applyBgImage(src);
+
+  bgDimSlider.value = dim;
+  bgDimValue.textContent = `${dim}%`;
+  
+  if (typeof applyDimnessState === 'function') {
+    await applyDimnessState();
+  } else {
+    screenBgOverlay.style.opacity = dim / 100;
+  }
+
+  bgBlurSlider.value = blur;
+  bgBlurValue.textContent = `${blur}px`;
+  screenBgContainer.style.filter = blur > 0 ? `blur(${blur}px)` : 'none';
+}
+
+// Data Migration for Whiteboard Photos and Coordinates on startup
+async function migrateLegacyData() {
+  const photos = await store.get('photos', []);
+  let needsSave = false;
+  
+  for (let i = 0; i < photos.length; i++) {
+    const photo = photos[i];
+    
+    // 1. Migrate image to IndexedDB Blob
+    if (photo.src && photo.src.startsWith('data:')) {
+      const blob = dataURLtoBlob(photo.src);
+      if (blob) {
+        await largeStore.set('photo_img_' + photo.id, blob);
+        delete photo.src;
+        needsSave = true;
+      }
+    }
+    
+    // 2. Migrate coordinate pixels to proportional percentages
+    if (photo.xPercent === undefined) {
+      const w = photo.w || 150;
+      const h = photo.h || 150;
+      const x = photo.x || (window.innerWidth / 2 - w / 2);
+      const y = photo.y || (window.innerHeight / 2 - h / 2);
+      
+      photo.xPercent = x / window.innerWidth;
+      photo.yPercent = y / window.innerHeight;
+      photo.w = w;
+      photo.h = h;
+      
+      delete photo.x;
+      delete photo.y;
+      needsSave = true;
+    }
+    
+    // 3. Migrate back from percentages to absolute pixels if needed
+    if (photo.wPercent !== undefined && photo.w === undefined) {
+      photo.w = Math.round(photo.wPercent * window.innerWidth);
+      photo.h = Math.round(photo.hPercent * window.innerHeight);
+      delete photo.wPercent;
+      delete photo.hPercent;
+      needsSave = true;
+    }
+  }
+
+  if (needsSave) {
+    await store.set('photos', photos);
+  }
+}
+
+// Startup Initialization sequence
+async function startupInit() {
+  await migrateLegacyData();
+  await initBackground();
+
+  // Clean up legacy tutorial tasks if present in user storage
+  const currentTasks = await store.get('tasks', []);
+  const onboardingTexts = [
+    "Welcome to Flash Dash!",
+    "Double-click the clock",
+    "Hover under the clock",
+    "Drag & drop image files"
+  ];
+  const filteredTasks = currentTasks.filter(t => !onboardingTexts.some(ot => t.text.includes(ot)));
+  if (filteredTasks.length !== currentTasks.length) {
+    await store.set('tasks', filteredTasks);
+  }
+
+  await initTasks();
+  await initFocusMode();
+  await loadShortcuts();
+  await renderBoard();
+}
+startupInit();

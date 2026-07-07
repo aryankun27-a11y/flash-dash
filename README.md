@@ -1,11 +1,10 @@
 # ⚡ Flash Dash
 
-> A beautiful, distraction-free new tab extension for Chrome. Big clock, Google search, goal photos, tasks, and bookmarks — all in one sleek dashboard.
+> A beautiful, distraction-free new tab extension for Chrome. Big clock, goal photos, tasks, and bookmarks — all in one sleek dashboard.
 
 ![Manifest V3](https://img.shields.io/badge/Manifest-V3-blueviolet?style=flat-square)
 ![Chrome Extension](https://img.shields.io/badge/Chrome-Extension-4285F4?style=flat-square&logo=googlechrome&logoColor=white)
 ![No Build Step](https://img.shields.io/badge/Build-None-success?style=flat-square)
-![License](https://img.shields.io/badge/License-MIT-lightgrey?style=flat-square)
 
 ---
 
@@ -14,10 +13,9 @@
 | Feature | Description |
 |---|---|
 | 🕐 **Clock** | Large, always-visible time display with AM/PM and date |
-| 🔍 **Google Search** | Spotlight-style search bar with autocomplete — focus with `Ctrl+G` |
 | 🖼️ **Photo Board** | Freely drag, resize, and layer goal/inspiration images, or drag and drop image files directly from your computer to pin them |
 | ✅ **Tasks** | Lightweight persistent to-do list on the right panel with drag-and-drop reordering |
-| 🔖 **Bookmarks** | Slide-out bookmark drawer + pin up to 6 shortcuts to the left toolbar with drag-and-drop reordering |
+| 🔖 **Bookmarks** | Slide-out bookmark drawer to quickly access all your chrome bookmarks |
 | 🌙 **Theme** | Dark / light mode toggle, persisted across tabs |
 | 👋 **Welcome Screen** | First-install overlay that walks new users through all features |
 
@@ -27,12 +25,9 @@
 
 > No build step required — Flash Dash is pure HTML, CSS, and JavaScript.
 
-### 1. Download the file
-```
-# download and unzip the release ZIP
-```
+### 1. Download the files
 
-### 2. Open Chrome/brave Extensions
+### 2. Open Chrome Extensions
 
 Navigate to `chrome://extensions` in your browser.
 
@@ -56,11 +51,10 @@ The extension requests only the minimum permissions needed:
 
 | Permission | Why it's needed |
 |---|---|
-| `storage` | Persists tasks, pinned shortcuts, theme preference, photos, and search history |
-| `unlimitedStorage` | Allows photo data URLs (base64 images) to be stored without hitting the 5 MB quota |
-| `bookmarks` | Reads your Chrome bookmarks to populate the bookmarks drawer and pin picker |
-| `tabs` | Navigates the current tab when you click a bookmark or search result |
-| `https://suggestqueries.google.com/` | Fetches Google autocomplete suggestions for the search bar |
+| `storage` | Persists tasks, theme preference, whiteboard photos, and background preferences |
+| `unlimitedStorage` | Allows photo data URLs (base64 images) to be stored without hitting the 5 MB local storage quota |
+| `bookmarks` | Reads your Chrome bookmarks to populate the bookmarks drawer |
+| `tabs` | Required to query and navigate current tabs when you open a bookmark |
 
 ---
 
@@ -71,7 +65,7 @@ flash-dash/
 ├── manifest.json       # Chrome Extension Manifest V3 config
 ├── newtab.html         # New tab page markup (loaded by Chrome on Ctrl+T)
 ├── style.css           # All styles — design tokens, layout, components
-├── script.js           # All runtime logic — clock, search, photos, tasks, etc.
+├── script.js           # All dashboard runtime logic — clock, photos, tasks, etc.
 ├── icons/
 │   ├── icon16.png      # Toolbar icon (16×16)
 │   ├── icon48.png      # Extensions page icon (48×48)
@@ -102,35 +96,10 @@ All data is stored in `chrome.storage.local`. Key reference:
 | `theme` | `"dark" \| "light"` | Current colour theme |
 | `tasks` | `Array<{text, done}>` | Task list |
 | `photos` | `Array<{id, src, x, y, w, h, z}>` | Photo board state |
-| `pinnedShortcuts` | `Array<{title, url}>` | Pinned toolbar shortcuts |
-| `searchHistory` | `string[]` | Recent search queries (max 5) |
-
-### Resetting the welcome screen (for testing)
-
-Open the Chrome DevTools console on any new tab page and run:
-
-```js
-chrome.storage.local.remove('welcomed');
-```
-
-Then open a new tab — the welcome overlay will appear again.
-
----
-
-## Browser Support
-
-| Browser | Status |
-|---|---|
-| Chrome 109+ | ✅ Fully supported |
-| Edge (Chromium) | ✅ Compatible |
-| Firefox | ❌ Manifest V3 not yet supported |
-| Safari | ❌ Not supported |
-
----
-
-## License
-
-MIT — feel free to fork, modify, and make it your own.
+| `boardLocked` | `boolean` | Whether the photo whiteboard is locked |
+| `bgImage` | `string` | Base64 background image data URL |
+| `bgDim` | `number` | Overlay dimness percentage (0–90) |
+| `bgBlur` | `number` | Background blur value in pixels (0–20) |
 
 ---
 
@@ -144,7 +113,6 @@ MIT — feel free to fork, modify, and make it your own.
 | **No servers** | Flash Dash has no backend, no analytics, no telemetry, and no accounts |
 | **No tracking** | No cookies, no fingerprinting, no usage tracking of any kind |
 | **Photos stay local** | Images you add to the board are encoded as base64 data URLs and stored locally — they are never uploaded anywhere |
-| **Search autocomplete** | When you type in the search bar, a request is sent directly from your browser to `suggestqueries.google.com` (Google's public autocomplete API). This is the same request Chrome itself makes natively and is subject to [Google's Privacy Policy](https://policies.google.com/privacy) |
 | **Bookmarks** | The extension reads your bookmarks locally via the Chrome API to display them in the drawer. They are never transmitted externally |
 
 This extension is designed to be fully auditable — the entire codebase is plain HTML, CSS, and JavaScript with no minification or obfuscation.
