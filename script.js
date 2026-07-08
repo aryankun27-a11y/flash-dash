@@ -13,6 +13,7 @@ function getDragAfterElement(container, y, selector) {
   }, { offset: Number.NEGATIVE_INFINITY }).element;
 }
 
+
 // ---------- storage helper (chrome.storage with localStorage fallback) ----------
 const store = {
   async get(key, fallback) {
@@ -597,6 +598,92 @@ function getResizeDirection(el, clientX, clientY) {
   return dir;
 }
 
+// ---------- Snap Guide Helpers ----------
+const SNAP_THRESHOLD = 12; // proximity in px to trigger snapping
+const SNAP_GAP = 16; // gap spacing for side-by-side snapping
+
+function getOtherPhotoRects(excludeId) {
+  const rects = [];
+  board.querySelectorAll('.photo').forEach(el => {
+    if (el.dataset.id === excludeId) return;
+    const r = el.getBoundingClientRect();
+    rects.push({ left: r.left, top: r.top, right: r.right, bottom: r.bottom, width: r.width, height: r.height });
+  });
+  return rects;
+}
+
+let _snapGuideEls = [];
+function showSnapGuides(xLines, yLines) {
+  clearSnapGuides();
+  xLines.forEach(x => {
+    const g = document.createElement('div');
+    g.className = 'snap-guide snap-guide-x';
+    g.style.left = x + 'px';
+    document.body.appendChild(g);
+    _snapGuideEls.push(g);
+  });
+  yLines.forEach(y => {
+    const g = document.createElement('div');
+    g.className = 'snap-guide snap-guide-y';
+    g.style.top = y + 'px';
+    document.body.appendChild(g);
+    _snapGuideEls.push(g);
+  });
+}
+
+function clearSnapGuides() {
+  _snapGuideEls.forEach(g => g.remove());
+  _snapGuideEls = [];
+}
+
+function computeSnap(dragRect, excludeId) {
+  const others = getOtherPhotoRects(excludeId);
+  let snapX = null, snapY = null;
+  const guideXSet = new Set(), guideYSet = new Set();
+
+  // Edges of the dragged element
+  const dLeft = dragRect.left, dRight = dragRect.right, dTop = dragRect.top, dBottom = dragRect.bottom;
+  const dCenterX = (dLeft + dRight) / 2, dCenterY = (dTop + dBottom) / 2;
+
+  for (const o of others) {
+    const oCenterX = (o.left + o.right) / 2, oCenterY = (o.top + o.bottom) / 2;
+
+    // --- Horizontal (X) snapping ---
+    // Left-to-left
+    if (Math.abs(dLeft - o.left) < SNAP_THRESHOLD && snapX === null) { snapX = o.left - dLeft; guideXSet.add(o.left); }
+    // Right-to-right
+    if (Math.abs(dRight - o.right) < SNAP_THRESHOLD && snapX === null) { snapX = o.right - dRight; guideXSet.add(o.right); }
+    // Left-to-right (side-by-side with gap)
+    if (Math.abs(dLeft - (o.right + SNAP_GAP)) < SNAP_THRESHOLD && snapX === null) { snapX = (o.right + SNAP_GAP) - dLeft; guideXSet.add(o.right + SNAP_GAP); }
+    // Right-to-left (side-by-side with gap)
+    if (Math.abs(dRight - (o.left - SNAP_GAP)) < SNAP_THRESHOLD && snapX === null) { snapX = (o.left - SNAP_GAP) - dRight; guideXSet.add(o.left - SNAP_GAP); }
+    // Left-to-right (flush, no gap)
+    if (Math.abs(dLeft - o.right) < SNAP_THRESHOLD && snapX === null) { snapX = o.right - dLeft; guideXSet.add(o.right); }
+    // Right-to-left (flush, no gap)
+    if (Math.abs(dRight - o.left) < SNAP_THRESHOLD && snapX === null) { snapX = o.left - dRight; guideXSet.add(o.left); }
+    // Center-to-center X
+    if (Math.abs(dCenterX - oCenterX) < SNAP_THRESHOLD && snapX === null) { snapX = oCenterX - dCenterX; guideXSet.add(oCenterX); }
+
+    // --- Vertical (Y) snapping ---
+    // Top-to-top
+    if (Math.abs(dTop - o.top) < SNAP_THRESHOLD && snapY === null) { snapY = o.top - dTop; guideYSet.add(o.top); }
+    // Bottom-to-bottom
+    if (Math.abs(dBottom - o.bottom) < SNAP_THRESHOLD && snapY === null) { snapY = o.bottom - dBottom; guideYSet.add(o.bottom); }
+    // Top-to-bottom (stacked with gap)
+    if (Math.abs(dTop - (o.bottom + SNAP_GAP)) < SNAP_THRESHOLD && snapY === null) { snapY = (o.bottom + SNAP_GAP) - dTop; guideYSet.add(o.bottom + SNAP_GAP); }
+    // Bottom-to-top (stacked with gap)
+    if (Math.abs(dBottom - (o.top - SNAP_GAP)) < SNAP_THRESHOLD && snapY === null) { snapY = (o.top - SNAP_GAP) - dBottom; guideYSet.add(o.top - SNAP_GAP); }
+    // Top-to-bottom (flush)
+    if (Math.abs(dTop - o.bottom) < SNAP_THRESHOLD && snapY === null) { snapY = o.bottom - dTop; guideYSet.add(o.bottom); }
+    // Bottom-to-top (flush)
+    if (Math.abs(dBottom - o.top) < SNAP_THRESHOLD && snapY === null) { snapY = o.top - dBottom; guideYSet.add(o.top); }
+    // Center-to-center Y
+    if (Math.abs(dCenterY - oCenterY) < SNAP_THRESHOLD && snapY === null) { snapY = oCenterY - dCenterY; guideYSet.add(oCenterY); }
+  }
+
+  return { snapX: snapX || 0, snapY: snapY || 0, guideX: [...guideXSet], guideY: [...guideYSet] };
+}
+
 function makeResizableAndDraggable(el, photo, onChange) {
   // Update mouse cursor on hover near borders/corners
   el.addEventListener('pointermove', (e) => {
@@ -628,38 +715,38 @@ function makeResizableAndDraggable(el, photo, onChange) {
     el.setPointerCapture(e.pointerId);
     
     if (dir) {
-      // Edge resizing mode
+      // Edge resizing mode with snapping
       function moveResize(ev) {
         const dx = ev.clientX - startX;
         const dy = ev.clientY - startY;
         
-        let newW = origW;
-        let newH = origH;
-        let newX = origX;
-        let newY = origY;
+        let newW = origW, newH = origH, newX = origX, newY = origY;
         
-        if (dir.includes("e")) {
-          newW = Math.max(50, origW + dx);
-        } else if (dir.includes("w")) {
-          const possibleW = origW - dx;
-          if (possibleW >= 50) {
-            newW = possibleW;
-            newX = origX + dx;
-          }
+        if (dir.includes("e")) { newW = Math.max(50, origW + dx); }
+        else if (dir.includes("w")) {
+          const pw = origW - dx;
+          if (pw >= 50) { newW = pw; newX = origX + dx; }
+        }
+        if (dir.includes("s")) { newH = Math.max(50, origH + dy); }
+        else if (dir.includes("n")) {
+          const ph = origH - dy;
+          if (ph >= 50) { newH = ph; newY = origY + dy; }
         }
         
-        if (dir.includes("s")) {
-          newH = Math.max(50, origH + dy);
-        } else if (dir.includes("n")) {
-          const possibleH = origH - dy;
-          if (possibleH >= 50) {
-            newH = possibleH;
-            newY = origY + dy;
-          }
-        }
+        // Compute snap based on new rect
+        const tempRect = { left: newX, top: newY, right: newX + newW, bottom: newY + newH };
+        const snap = computeSnap(tempRect, photo.id);
         
-        photo.w = newW;
-        photo.h = newH;
+        // Apply snap adjustments to the resize dimension
+        if (dir.includes("e") && snap.snapX) { newW += snap.snapX; }
+        if (dir.includes("s") && snap.snapY) { newH += snap.snapY; }
+        if (dir.includes("w") && snap.snapX) { newX += snap.snapX; newW -= snap.snapX; }
+        if (dir.includes("n") && snap.snapY) { newY += snap.snapY; newH -= snap.snapY; }
+        
+        newW = Math.max(50, newW);
+        newH = Math.max(50, newH);
+        
+        photo.w = newW; photo.h = newH;
         photo.xPercent = newX / window.innerWidth;
         photo.yPercent = newY / window.innerHeight;
         
@@ -667,11 +754,14 @@ function makeResizableAndDraggable(el, photo, onChange) {
         el.style.height = newH + 'px';
         el.style.left = newX + 'px';
         el.style.top = newY + 'px';
+        
+        showSnapGuides(snap.guideX, snap.guideY);
       }
       
       function upResize() {
         el.removeEventListener('pointermove', moveResize);
         el.removeEventListener('pointerup', upResize);
+        clearSnapGuides();
         onChange();
       }
       
@@ -679,31 +769,41 @@ function makeResizableAndDraggable(el, photo, onChange) {
       el.addEventListener('pointerup', upResize);
       
     } else {
-      // General dragging mode
+      // General dragging mode with snapping
       el.style.cursor = 'grabbing';
       
       function moveDrag(ev) {
         const dx = ev.clientX - startX;
         const dy = ev.clientY - startY;
         
-        const x = origX + dx;
-        const y = origY + dy;
+        let x = origX + dx;
+        let y = origY + dy;
         
         const margin = 20;
-        const clampedX = Math.max(margin, Math.min(window.innerWidth - (photo.w || 150) - margin, x));
-        const clampedY = Math.max(margin, Math.min(window.innerHeight - (photo.h || 150) - margin, y));
+        x = Math.max(margin, Math.min(window.innerWidth - (photo.w || 150) - margin, x));
+        y = Math.max(margin, Math.min(window.innerHeight - (photo.h || 150) - margin, y));
         
-        photo.xPercent = clampedX / window.innerWidth;
-        photo.yPercent = clampedY / window.innerHeight;
+        // Compute snap
+        const w = photo.w || 150, h = photo.h || 150;
+        const tempRect = { left: x, top: y, right: x + w, bottom: y + h };
+        const snap = computeSnap(tempRect, photo.id);
+        x += snap.snapX;
+        y += snap.snapY;
         
-        el.style.left = clampedX + 'px';
-        el.style.top = clampedY + 'px';
+        photo.xPercent = x / window.innerWidth;
+        photo.yPercent = y / window.innerHeight;
+        
+        el.style.left = x + 'px';
+        el.style.top = y + 'px';
+        
+        showSnapGuides(snap.guideX, snap.guideY);
       }
       
       function upDrag() {
         el.removeEventListener('pointermove', moveDrag);
         el.removeEventListener('pointerup', upDrag);
         el.style.cursor = 'grab';
+        clearSnapGuides();
         onChange();
       }
       
@@ -829,6 +929,51 @@ clearPhotosBtn.addEventListener('click', async () => {
   renderBoard();
 });
 
+// Smart auto-grid placement: place new photos side-by-side, wrapping rows
+function computeAutoGridPosition(existingPhotos, w, h, dropCoords) {
+  if (dropCoords) {
+    return { x: dropCoords.x - w / 2, y: dropCoords.y - h / 2 };
+  }
+
+  const GRID_GAP = 16;
+  const START_X = 100; // Clear the left toolbar
+  const START_Y = 30;
+  const MAX_X = window.innerWidth - 280; // Clear the right panel
+
+  if (existingPhotos.length === 0) {
+    return { x: START_X, y: START_Y };
+  }
+
+  // Find the last photo placed and position after it
+  const last = existingPhotos[existingPhotos.length - 1];
+  const lastX = (last.xPercent || 0) * window.innerWidth;
+  const lastY = (last.yPercent || 0) * window.innerHeight;
+  const lastW = last.w || 150;
+  const lastH = last.h || 150;
+
+  let nextX = lastX + lastW + GRID_GAP;
+  let nextY = lastY;
+
+  // If the next position would overflow, wrap to the next row
+  if (nextX + w > MAX_X) {
+    nextX = START_X;
+    // Find the tallest element in the current row to determine the Y of the next row
+    let rowMaxBottom = lastY + lastH;
+    for (const p of existingPhotos) {
+      const pX = (p.xPercent || 0) * window.innerWidth;
+      const pY = (p.yPercent || 0) * window.innerHeight;
+      const pH = p.h || 150;
+      // Consider photos in the same horizontal row (similar Y)
+      if (Math.abs(pY - lastY) < 10) {
+        rowMaxBottom = Math.max(rowMaxBottom, pY + pH);
+      }
+    }
+    nextY = rowMaxBottom + GRID_GAP;
+  }
+
+  return { x: nextX, y: nextY };
+}
+
 async function addPhotos(files, dropCoords = null) {
   const photos = await store.get('photos', []);
   const existingSnapshot = [...photos];
@@ -862,29 +1007,16 @@ async function addPhotos(files, dropCoords = null) {
       w = Math.round(MAX_SIDE * (natW / natH));
     }
 
-    let x, y;
-    if (dropCoords) {
-      const offset = i * 15;
-      x = dropCoords.x - w / 2 + offset;
-      y = dropCoords.y - h / 2 + offset;
-    } else if (existingSnapshot.length > 0) {
-      const anchor = existingSnapshot[Math.floor(Math.random() * existingSnapshot.length)];
-      const anchorX = (anchor.xPercent || 0.5) * window.innerWidth;
-      const anchorY = (anchor.yPercent || 0.5) * window.innerHeight;
+    // Only use dropCoords for the first dropped file, offset subsequent ones
+    const coords = dropCoords
+      ? { x: dropCoords.x - w / 2 + (i * 15), y: dropCoords.y - h / 2 + (i * 15) }
+      : null;
 
-      const minOff = 100, maxOff = 200;
-      const randOff = () => (minOff + Math.random() * (maxOff - minOff)) * (Math.random() < 0.5 ? 1 : -1);
-
-      x = anchorX + randOff();
-      y = anchorY + randOff();
-    } else {
-      x = window.innerWidth  / 2 - w / 2;
-      y = window.innerHeight / 2 - h / 2;
-    }
+    const { x, y } = computeAutoGridPosition(existingSnapshot, w, h, coords);
 
     const margin = 20;
-    x = Math.max(margin, Math.min(window.innerWidth  - w - margin, x));
-    y = Math.max(margin, Math.min(window.innerHeight - h - margin, y));
+    const clampedX = Math.max(margin, Math.min(window.innerWidth - w - margin, x));
+    const clampedY = Math.max(margin, Math.min(window.innerHeight - h - margin, y));
 
     _photoZCounter += 1;
     const photoId = Date.now() + Math.random().toString(36).slice(2);
@@ -894,8 +1026,8 @@ async function addPhotos(files, dropCoords = null) {
 
     const photo = {
       id: photoId,
-      xPercent: x / window.innerWidth,
-      yPercent: y / window.innerHeight,
+      xPercent: clampedX / window.innerWidth,
+      yPercent: clampedY / window.innerHeight,
       w: w,
       h: h,
       z: _photoZCounter,

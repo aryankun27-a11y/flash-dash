@@ -59,7 +59,7 @@ body {
 
 .photo {
   position: absolute;
-  border-radius: 8px;
+  border-radius: 0; /* sharp corners */
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.22);
   border: 1px solid rgba(255, 255, 255, 0.08);
   cursor: grab;
@@ -72,6 +72,32 @@ body {
   overflow: visible;
   background: transparent;
   padding: 0;
+}
+
+/* Snap alignment guide lines */
+.snap-guide {
+  position: fixed;
+  z-index: 9999;
+  pointer-events: none;
+  background: none;
+}
+.snap-guide-x {
+  width: 1px;
+  top: 0;
+  bottom: 0;
+  border-left: 1px dashed rgba(100, 180, 255, 0.55);
+}
+.snap-guide-y {
+  height: 1px;
+  left: 0;
+  right: 0;
+  border-top: 1px dashed rgba(100, 180, 255, 0.55);
+}
+[data-theme="light"] .snap-guide-x {
+  border-left-color: rgba(0, 100, 220, 0.45);
+}
+[data-theme="light"] .snap-guide-y {
+  border-top-color: rgba(0, 100, 220, 0.45);
 }
 
 .photo:active {
@@ -112,7 +138,7 @@ body {
   height: 100%;
   object-fit: cover;
   pointer-events: none;
-  border-radius: 8px;
+  border-radius: 0; /* sharp corners */
   background: var(--glass-strong);
 }
 

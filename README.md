@@ -12,12 +12,30 @@
 
 | Feature | Description |
 |---|---|
-| 🕐 **Clock** | Large, always-visible time display with AM/PM and date |
-| 🖼️ **Photo Board** | Freely drag, resize, and layer goal/inspiration images, or drag and drop image files directly from your computer to pin them |
-| ✅ **Tasks** | Lightweight persistent to-do list on the right panel with drag-and-drop reordering |
-| 🔖 **Bookmarks** | Slide-out bookmark drawer to quickly access all your chrome bookmarks |
-| 🌙 **Theme** | Dark / light mode toggle, persisted across tabs |
-| 👋 **Welcome Screen** | First-install overlay that walks new users through all features |
+| 🕐 **Clock & Focus Timer** | Large time display with AM/PM and date. Double-click the clock/background or press `Esc` to toggle **Focus Mode**, which activates a customizable countdown timer with interactive controls, progress-based background dimming, warm bell chime synthesis, and desktop notification alerts. |
+| 🖼️ **Photo Board** | Drag, resize, and layer goal/inspiration images, or drag-and-drop image files directly from your desktop. Features smart snapping to align centers and edges with nearby photos, and an interface lock. |
+| 🫥 **Ghost Grid Pinned Shortcuts** | Hover beneath the clock to reveal a hidden shortcut tile grid. Pin up to 8 custom web links with automatic favicon fetching. |
+| ✅ **Tasks** | Lightweight persistent to-do list on the right panel with dedicated grab handles for drag-and-drop reordering, and inline double-click editing. |
+| 🔖 **Bookmarks** | Slide-out bookmarks drawer with real-time text searching to quickly access all your Chrome bookmarks. |
+| 🌙 **Theme & Styling** | Sleek glassmorphic aesthetics. Dark / light mode toggle persisted across tabs. |
+
+---
+
+## Gestures & Keyboard Shortcuts
+
+### 🖱️ Gestures
+* **Double-click** background or clock to toggle Focus Mode.
+* **Hover** under the clock to reveal your Ghost Grid shortcuts.
+* **Drag & drop** image files from your computer to pin them directly to the whiteboard.
+* **Drag/Resize** whiteboard photos to align them. Edges and centers automatically snap to neighboring photos within a 12px range.
+
+### ⌨️ Keybinds
+* <kbd>Esc</kbd> — Toggle Focus Mode (when inputs aren't focused) or close open drawers.
+* <kbd>Enter</kbd> — Save inline task edits or add a new task.
+* **Timer Shortcuts (Focus Mode Active)**:
+  * <kbd>Space</kbd> — Play / Pause the countdown.
+  * <kbd>R</kbd> — Reset the timer.
+  * <kbd>M</kbd> — Mute / Unmute completion sound.
 
 ---
 
@@ -51,8 +69,8 @@ The extension requests only the minimum permissions needed:
 
 | Permission | Why it's needed |
 |---|---|
-| `storage` | Persists tasks, theme preference, whiteboard photos, and background preferences |
-| `unlimitedStorage` | Allows photo data URLs (base64 images) to be stored without hitting the 5 MB local storage quota |
+| `storage` | Persists tasks, theme preference, whiteboard layout locks, shortcuts, and background settings |
+| `unlimitedStorage` | Allows the database to save high-resolution background and whiteboard photos without browser storage limits |
 | `bookmarks` | Reads your Chrome bookmarks to populate the bookmarks drawer |
 | `tabs` | Required to query and navigate current tabs when you open a bookmark |
 
@@ -86,20 +104,36 @@ Open any file directly in your editor. Changes are reflected immediately after r
 3. Click the **↺ refresh** icon on the Flash Dash card
 4. Open a new tab
 
-### Storage keys
+---
 
-All data is stored in `chrome.storage.local`. Key reference:
+## Storage & Database Architecture
+
+Flash Dash uses a hybrid local storage system to optimize performance and prevent storage quota limits:
+
+### 1. IndexedDB (`FlashDashDB`)
+Large binary assets are stored as raw `Blob` objects under `AssetsStore`:
+* `bgImage`: The screen-wide custom background image file.
+* `photo_img_<photoId>`: Pinned whiteboard images.
+
+### 2. Chrome Storage (`chrome.storage.local`)
+Lightweight configuration states and JSON objects. Key reference:
 
 | Key | Type | Description |
 |---|---|---|
-| `welcomed` | `boolean` | Whether the user has seen the welcome screen |
 | `theme` | `"dark" \| "light"` | Current colour theme |
 | `tasks` | `Array<{text, done}>` | Task list |
-| `photos` | `Array<{id, src, x, y, w, h, z}>` | Photo board state |
+| `photos` | `Array<{id, xPercent, yPercent, w, h, z}>` | Whiteboard layout coordinates (in screen percentages), dimensions, and z-index layering |
 | `boardLocked` | `boolean` | Whether the photo whiteboard is locked |
-| `bgImage` | `string` | Base64 background image data URL |
+| `bgImage` | `"MIGRATED" \| null` | Migration state sentinel for background image |
 | `bgDim` | `number` | Overlay dimness percentage (0–90) |
 | `bgBlur` | `number` | Background blur value in pixels (0–20) |
+| `shortcuts` | `Array<{title, url}>` | List of pinned Ghost Grid shortcuts |
+| `focusMode` | `boolean` | Focus Mode active state |
+| `focusTimerState` | `"idle" \| "running" \| "paused" \| "finished"` | Focus timer state |
+| `focusTimerEndTimestamp` | `number` | Target end timestamp for running timer |
+| `focusTimerRemaining` | `number` | Remaining milliseconds on pause/idle |
+| `focusTimerDuration` | `number` | Default timer duration (minutes) |
+| `focusTimerSoundEnabled` | `boolean` | Play synthesizer sound on timer finish |
 
 ---
 
@@ -109,10 +143,10 @@ All data is stored in `chrome.storage.local`. Key reference:
 
 | What | Details |
 |---|---|
-| **Local storage only** | All data (tasks, photos, bookmarks, settings) is stored exclusively in `chrome.storage.local` on your own device |
+| **Local storage only** | All configurations, shortcuts, and tasks are stored exclusively in `chrome.storage.local` on your own device |
 | **No servers** | Flash Dash has no backend, no analytics, no telemetry, and no accounts |
 | **No tracking** | No cookies, no fingerprinting, no usage tracking of any kind |
-| **Photos stay local** | Images you add to the board are encoded as base64 data URLs and stored locally — they are never uploaded anywhere |
+| **Photos stay local** | Images you add to the board and background are stored locally as binary Blobs in IndexedDB — they are never uploaded anywhere |
 | **Bookmarks** | The extension reads your bookmarks locally via the Chrome API to display them in the drawer. They are never transmitted externally |
 
 This extension is designed to be fully auditable — the entire codebase is plain HTML, CSS, and JavaScript with no minification or obfuscation.
