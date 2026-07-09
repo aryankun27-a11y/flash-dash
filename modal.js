@@ -117,34 +117,48 @@ const ModalManager = {
       this.currentResolve = resolve;
       this.content.innerHTML = `
         <h2 class="modal-welcome-title">⚡ Welcome to Flash Dash!</h2>
-        <p class="modal-welcome-desc">A beautiful, premium, distraction-free dashboard. Let's look at the core mechanics:</p>
+        <p class="modal-welcome-desc">A premium, distraction-free dashboard. Here are the core features:</p>
         <ul class="modal-welcome-list">
           <li class="modal-welcome-item">
             <span class="modal-welcome-icon">🕐</span>
             <div class="modal-welcome-text">
               <strong>Typographic Focus Countdown</strong>
-              <span>Double-click background/clock to enter a sleek countdown space. Select sequential duration presets (5m, 10m, 25m, 50m) with micro-tick animations.</span>
-            </div>
-          </li>
-          <li class="modal-welcome-item">
-            <span class="modal-welcome-icon">✨</span>
-            <div class="modal-welcome-text">
-              <strong>Adaptive Color Accent</strong>
-              <span>Set custom background images inside settings. Checkboxes, buttons, and glowing accents will extract and match its dominant colors.</span>
+              <span>Double-click the background or clock to enter Focus Mode. Select duration presets (5m, 10m, 25m, 50m) with micro-tick animations.</span>
             </div>
           </li>
           <li class="modal-welcome-item">
             <span class="modal-welcome-icon">↔️</span>
             <div class="modal-welcome-text">
               <strong>Zero-Distraction Sidebars</strong>
-              <span>Left vertical toolbar and right tasks card slide out on hover near the screen edges, leaving a completely clean view.</span>
+              <span>Left vertical toolbar and right tasks cards are fully hidden by default. Hover near screen edges to reveal them with smooth slide-ins.</span>
+            </div>
+          </li>
+          <li class="modal-welcome-item">
+            <span class="modal-welcome-icon">✅</span>
+            <div class="modal-welcome-text">
+              <strong>Interactive Task List</strong>
+              <span>Manage your daily schedule on the right-side task card. Drag-and-drop to reorder tasks easily, and double-click to edit inline.</span>
+            </div>
+          </li>
+          <li class="modal-welcome-item">
+            <span class="modal-welcome-icon">🔖</span>
+            <div class="modal-welcome-text">
+              <strong>Chrome Bookmarks Drawer</strong>
+              <span>Access all Chrome bookmarks in the slide drawer, complete with real-time text search filtering.</span>
             </div>
           </li>
           <li class="modal-welcome-item">
             <span class="modal-welcome-icon">🖼️</span>
             <div class="modal-welcome-text">
-              <strong>Goal Whiteboard</strong>
-              <span>Drag &amp; drop images directly. Resizing and dragging snaps alignment to borders. Sidebars auto-hide during adjustments.</span>
+              <strong>Snapping Goal Whiteboard</strong>
+              <span>Drag &amp; drop images directly. Resizing and dragging snaps borders. Overlay sidebars auto-hide during whiteboard adjustments.</span>
+            </div>
+          </li>
+          <li class="modal-welcome-item">
+            <span class="modal-welcome-icon">🎨</span>
+            <div class="modal-welcome-text">
+              <strong>Adaptive Themes &amp; Accent Colors</strong>
+              <span>Accents, active button states, and checkboxes adapt dynamically to match your custom background HSL palette. Toggle Light/Dark mode in the toolbar.</span>
             </div>
           </li>
         </ul>
