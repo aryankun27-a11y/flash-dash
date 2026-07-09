@@ -122,15 +122,8 @@ const ModalManager = {
           <li class="modal-welcome-item">
             <span class="modal-welcome-icon">🕐</span>
             <div class="modal-welcome-text">
-              <strong>Typographic Focus Countdown</strong>
+              <strong>Focus Countdown</strong>
               <span>Double-click the background or clock to enter Focus Mode. Select duration presets (5m, 10m, 25m, 50m) with micro-tick animations.</span>
-            </div>
-          </li>
-          <li class="modal-welcome-item">
-            <span class="modal-welcome-icon">↔️</span>
-            <div class="modal-welcome-text">
-              <strong>Zero-Distraction Sidebars</strong>
-              <span>Left vertical toolbar and right tasks cards are fully hidden by default. Hover near screen edges to reveal them with smooth slide-ins.</span>
             </div>
           </li>
           <li class="modal-welcome-item">
@@ -152,13 +145,6 @@ const ModalManager = {
             <div class="modal-welcome-text">
               <strong>Snapping Goal Whiteboard</strong>
               <span>Drag &amp; drop images directly. Resizing and dragging snaps borders. Overlay sidebars auto-hide during whiteboard adjustments.</span>
-            </div>
-          </li>
-          <li class="modal-welcome-item">
-            <span class="modal-welcome-icon">🎨</span>
-            <div class="modal-welcome-text">
-              <strong>Adaptive Themes &amp; Accent Colors</strong>
-              <span>Accents, active button states, and checkboxes adapt dynamically to match your custom background HSL palette. Toggle Light/Dark mode in the toolbar.</span>
             </div>
           </li>
         </ul>

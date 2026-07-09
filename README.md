@@ -1,6 +1,6 @@
 # ⚡ Flash Dash
 
-> A premium, distraction-free, ultra-minimalist new tab extension for Chrome. High-fidelity glassmorphic cards, adaptive theme accenting, zero-distraction hidden sidebars, tasks list, bookmarks drawer, and a typographic Pomodoro timer.
+> A premium, distraction-free new tab extension for Chrome. Glassmorphic cards, tasks lists, bookmarks drawers, whiteboard, and a typographic Focus Countdown timer.
 
 ![Manifest V3](https://img.shields.io/badge/Manifest-V3-blueviolet?style=flat-square)
 ![Chrome Extension](https://img.shields.io/badge/Chrome-Extension-4285F4?style=flat-square&logo=googlechrome&logoColor=white)
@@ -12,12 +12,11 @@
 
 | Feature | Description |
 |---|---|
-| 🕐 **Typographic Focus Countdown** | Premium geometric display using `Plus Jakarta Sans` thin numerals. Double-click the background or clock to enter **Focus Mode**. Choose logically ordered presets (**5m, 10m, 25m, 50m**) that sync active states automatically. Includes a scale-down micro-tick animation on each second. |
-| 🫥 **Zero-Distraction Layout** | Both the left vertical toolbar and the right tasks card are fully hidden off-screen by default. Hovering near the screen edges reveals them with smooth cubic-bezier transitions. |
-| 🎨 **Adaptive Color Accent** | Calibrated color extraction algorithm draws your uploaded background image onto a hidden canvas, extracts the dominant HSL tone, and applies matching accent colors to all active buttons, checkmark boxes, and glowing details. |
+| 🕐 **Focus Countdown** | Premium geometric display using `Plus Jakarta Sans` thin numerals. Double-click the background or clock to enter **Focus Mode**. Choose logically ordered presets (**5m, 10m, 25m, 50m**) that sync active states automatically. Includes a scale-down micro-tick animation on each second. |
 | 🖼️ **Goal Whiteboard** | Drag, resize, and layer inspiration images, or drag-and-drop image files directly from your desktop. Snaps alignment to screen margins. Toolbar overlays automatically hide during resizing/dragging to stay out of your way. |
 | 🫥 **Ghost Grid Shortcuts** | Hover beneath the date to reveal a hidden grid of quick web links with automatic favicon fetching. |
 | ✅ **Tasks & Bookmarks Drawer** | Slide-out panels with real-time text searching for Chrome bookmarks and a drag-and-drop to-do manager for tasks. |
+| 🌙 **Theme Toggle** | Persistent light and dark theme mode toggle in the toolbar. |
 
 ---
 
@@ -25,8 +24,6 @@
 
 ### 🖱️ Gestures
 * **Double-click** background or clock to toggle Focus Mode.
-* **Hover Left Edge** to slide out the vertical toolbar and bookmarks/settings drawers.
-* **Hover Right Edge** to slide out the tasks card.
 * **Hover Under Clock** to reveal the Ghost Grid shortcuts.
 * **Drag & drop** image files from your computer to pin them directly to the whiteboard.
 * **Drag/Resize** photos; toolbars hide automatically and edge snaps align items seamlessly.
@@ -49,9 +46,9 @@ No build step required — Flash Dash is pure HTML, CSS, and modular JavaScript.
 flash-dash/
 ├── manifest.json       # Chrome Extension Manifest V3 config
 ├── newtab.html         # Onboarding cards, layouts, and DOM structure
-├── style.css           # Glassmorphic tokens, transitions, and indicators
+├── style.css           # Glassmorphic tokens, transitions, and layout
 ├── storage.js          # IndexedDB wrapper and chrome.storage sync loops
-├── ui.js               # Sidebars reveal event listeners & color extraction HSL logic
+├── ui.js               # Background images upload, dim/blur sliders, and theme manager
 ├── whiteboard.js       # Drag, resize, photo snap calculations, and overlay freeze hooks
 ├── timer.js            # Focus session states, presets, and tick animations
 ├── modal.js            # Interactive onboarding modal card manager
