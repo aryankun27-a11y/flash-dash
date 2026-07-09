@@ -59,9 +59,10 @@ body {
 
 .photo {
   position: absolute;
-  border-radius: 0; /* sharp corners */
+  border-radius: 0;
+  /* sharp corners */
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.22);
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  border: 1px solid var(--border);
   cursor: grab;
   touch-action: none;
   box-sizing: border-box;
@@ -70,8 +71,11 @@ body {
   transition: transform 0.15s ease, box-shadow 0.15s ease;
   pointer-events: auto;
   overflow: visible;
-  background: transparent;
+  background: var(--glass);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
   padding: 0;
+  /* padding back to 0 since caption is removed */
 }
 
 /* Snap alignment guide lines */
@@ -81,21 +85,25 @@ body {
   pointer-events: none;
   background: none;
 }
+
 .snap-guide-x {
   width: 1px;
   top: 0;
   bottom: 0;
   border-left: 1px dashed rgba(100, 180, 255, 0.55);
 }
+
 .snap-guide-y {
   height: 1px;
   left: 0;
   right: 0;
   border-top: 1px dashed rgba(100, 180, 255, 0.55);
 }
+
 [data-theme="light"] .snap-guide-x {
   border-left-color: rgba(0, 100, 220, 0.45);
 }
+
 [data-theme="light"] .snap-guide-y {
   border-top-color: rgba(0, 100, 220, 0.45);
 }
@@ -117,9 +125,17 @@ body {
 }
 
 @keyframes photo-lift-ring {
-  0%   { box-shadow: 0 0 0 0px rgba(255, 255, 255, 0.5); }
-  50%  { box-shadow: 0 0 0 4px rgba(255, 255, 255, 0.22); }
-  100% { box-shadow: none; }
+  0% {
+    box-shadow: 0 0 0 0px rgba(255, 255, 255, 0.5);
+  }
+
+  50% {
+    box-shadow: 0 0 0 4px rgba(255, 255, 255, 0.22);
+  }
+
+  100% {
+    box-shadow: none;
+  }
 }
 
 [data-theme="light"] .photo.photo-lifted {
@@ -127,9 +143,17 @@ body {
 }
 
 @keyframes photo-lift-ring-light {
-  0%   { box-shadow: 0 0 0 0px rgba(0, 0, 0, 0.3); }
-  50%  { box-shadow: 0 0 0 4px rgba(0, 0, 0, 0.12); }
-  100% { box-shadow: none; }
+  0% {
+    box-shadow: 0 0 0 0px rgba(0, 0, 0, 0.3);
+  }
+
+  50% {
+    box-shadow: 0 0 0 4px rgba(0, 0, 0, 0.12);
+  }
+
+  100% {
+    box-shadow: none;
+  }
 }
 
 .photo img {
@@ -138,7 +162,8 @@ body {
   height: 100%;
   object-fit: cover;
   pointer-events: none;
-  border-radius: 0; /* sharp corners */
+  border-radius: 0;
+  /* sharp corners */
   background: var(--glass-strong);
 }
 
@@ -392,9 +417,16 @@ body {
   justify-content: center;
   z-index: 3;
   pointer-events: none;
-  transform: translateY(4vh);
   user-select: none;
   -webkit-user-select: none;
+}
+
+.time-container {
+  display: grid;
+  grid-template-areas: "time";
+  align-items: center;
+  justify-content: center;
+  width: 100%;
 }
 
 .clock {
@@ -404,22 +436,45 @@ body {
   letter-spacing: -2px;
   line-height: 1;
   font-variant-numeric: tabular-nums;
-  display: flex;
-  align-items: flex-end;
-  gap: 10px;
   color: var(--text);
   user-select: none;
   -webkit-user-select: none;
+
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: baseline;
+  width: 100%;
+}
+
+.clock-hours {
+  justify-self: end;
+  text-align: right;
+}
+
+.clock-colon {
+  justify-self: center;
+  text-align: center;
+  padding: 0 4px;
+}
+
+.clock-minutes {
+  justify-self: start;
+  text-align: left;
+  position: relative;
 }
 
 .ampm {
+  position: absolute;
+  left: 100%;
+  bottom: 0.16em;
+  margin-left: 12px;
   font-size: 0.16em;
   font-weight: 600;
   color: var(--text-dim);
-  margin-bottom: 0.22em;
   letter-spacing: 1px;
   user-select: none;
   -webkit-user-select: none;
+  white-space: nowrap;
 }
 
 .date {
@@ -598,9 +653,12 @@ body.focus-mode .board {
   pointer-events: none !important;
   transition: opacity 0.5s ease;
 }
+
 body.focus-mode .stage {
-  pointer-events: auto; /* keeps clock clickable if needed */
+  pointer-events: auto;
+  /* keeps clock clickable if needed */
 }
+
 /* Thin elegant custom scrollbars */
 .task-list,
 .bookmarks-list {
@@ -681,7 +739,7 @@ body.focus-mode .stage {
   min-height: 60px;
 }
 
-.clock:hover ~ .ghost-grid,
+.clock:hover ~ .clock-details .ghost-grid,
 .date:hover ~ .ghost-grid,
 .ghost-grid:hover,
 .ghost-grid.visible,
@@ -853,8 +911,15 @@ body.focus-mode .stage {
 }
 
 @keyframes drag-overlay-float {
-  0%, 100% { transform: translateY(0); }
-  50% { transform: translateY(-8px); }
+
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+
+  50% {
+    transform: translateY(-8px);
+  }
 }
 
 [data-theme="light"] .drag-overlay {
@@ -888,6 +953,7 @@ body.focus-mode .stage {
 .drawer-search-container {
   margin-bottom: 12px;
 }
+
 #bookmarkSearchInput {
   width: 100%;
   background: var(--glass);
@@ -899,9 +965,11 @@ body.focus-mode .stage {
   outline: none;
   transition: border-color .15s ease;
 }
+
 #bookmarkSearchInput::placeholder {
   color: var(--text-dim);
 }
+
 #bookmarkSearchInput:focus {
   border-color: var(--text-dim);
 }
@@ -912,6 +980,7 @@ body.focus-mode .stage {
   align-items: baseline;
   gap: 6px;
 }
+
 .clear-tasks-btn {
   background: transparent;
   border: none;
@@ -922,9 +991,11 @@ body.focus-mode .stage {
   padding: 2px 4px;
   font-weight: 500;
 }
+
 .clear-tasks-btn:hover {
   color: var(--text);
 }
+
 .task-edit-input {
   flex: 1;
   min-width: 0;
@@ -941,6 +1012,7 @@ body.focus-mode .stage {
   font-family: inherit;
   box-sizing: border-box;
 }
+
 .task-edit-input:focus {
   border-color: var(--text-dim);
 }
@@ -949,9 +1021,11 @@ body.focus-mode .stage {
 .board.board-locked .photo {
   cursor: default;
 }
+
 .board.board-locked .photo:active {
   cursor: default;
 }
+
 .board.board-locked .photo .resize,
 .board.board-locked .photo .del {
   display: none !important;
@@ -961,7 +1035,8 @@ body.focus-mode .stage {
 .screen-bg-container {
   position: fixed;
   inset: 0;
-  z-index: 0; /* Behind everything */
+  z-index: 0;
+  /* Behind everything */
   pointer-events: none;
   background-size: cover;
   background-position: center;
@@ -1185,26 +1260,60 @@ body.focus-mode .stage {
 
 /* ---------- Focus Mode Countdown Timer Layout ---------- */
 .clock-view {
+  grid-area: time;
   display: flex;
   flex-direction: column;
   align-items: center;
   width: 100%;
+  opacity: 1;
+  transform: scale(1);
+  transition: opacity 0.4s cubic-bezier(0.4, 0, 0.2, 1), transform 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+  pointer-events: auto;
+  position: relative;
 }
 
 .timer-view {
-  display: none;
+  grid-area: time;
+  display: flex;
   flex-direction: column;
   align-items: center;
   width: 100%;
+  opacity: 0;
+  transform: scale(0.96);
+  transition: opacity 0.4s cubic-bezier(0.4, 0, 0.2, 1), transform 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+  pointer-events: none;
+  position: relative;
 }
 
-/* Toggle visibility in Focus Mode */
+.clock-details,
+.timer-controls {
+  position: absolute;
+  top: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  pointer-events: none;
+}
+
+.clock-details *,
+.timer-controls * {
+  pointer-events: auto;
+}
+
+/* Toggle visibility in Focus Mode with smooth transitions */
 .focus-mode .clock-view {
-  display: none;
+  opacity: 0;
+  transform: scale(0.96);
+  pointer-events: none;
 }
 
 .focus-mode .timer-view {
-  display: flex;
+  opacity: 1;
+  transform: scale(1);
+  pointer-events: auto;
 }
 
 .timer-display-container {
@@ -1227,6 +1336,27 @@ body.focus-mode .stage {
   transition: transform 0.15s ease, opacity 0.15s ease;
   user-select: none;
   pointer-events: auto;
+
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: baseline;
+  width: 100%;
+}
+
+.timer-hours {
+  justify-self: end;
+  text-align: right;
+}
+
+.timer-colon {
+  justify-self: center;
+  text-align: center;
+  padding: 0 4px;
+}
+
+.timer-minutes {
+  justify-self: start;
+  text-align: left;
 }
 
 .timer-time:hover {
@@ -1297,16 +1427,15 @@ body.focus-mode .stage {
   font-size: 11px;
   color: var(--text-dim);
   opacity: 0;
-  transition: opacity 0.15s ease;
+  transition: opacity 0.35s cubic-bezier(0.4, 0, 0.2, 1);
   user-select: none;
   pointer-events: none;
   font-weight: 500;
   letter-spacing: 0.3px;
 }
 
-/* Show guide when timer is paused or running and not editing */
-.timer-view.paused:not(.editing) .timer-shortcuts-help,
-.timer-view.running:not(.editing) .timer-shortcuts-help {
+/* Show guide when timer is paused and not editing */
+.timer-view.paused:not(.editing) .timer-shortcuts-help {
   opacity: 0.55;
 }
 
@@ -1322,8 +1451,15 @@ body.focus-mode .stage {
 }
 
 @keyframes timer-border-flash {
-  0%, 100% { opacity: 0.1; }
-  50% { opacity: 0.5; }
+
+  0%,
+  100% {
+    opacity: 0.1;
+  }
+
+  50% {
+    opacity: 0.5;
+  }
 }
 
 /* Slide-hide toolbar when timer is actively running in Focus Mode */
@@ -1331,4 +1467,275 @@ body.focus-mode .stage {
   opacity: 0 !important;
   pointer-events: none !important;
   transform: translateY(-50%) translateX(-24px) !important;
+}
+
+/* ==============================================================
+   Custom Glassmorphic Modals and Dialogs
+   ============================================================== */
+.custom-modal-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 100000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.25s ease;
+}
+
+.custom-modal-overlay.active {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.custom-modal-card {
+  background: var(--glass);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 26px;
+  max-width: 440px;
+  width: calc(100% - 48px);
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.45);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  transform: scale(0.94);
+  transition: transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
+  color: var(--text);
+}
+
+.custom-modal-overlay.active .custom-modal-card {
+  transform: scale(1);
+}
+
+.custom-modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+  margin-top: 24px;
+}
+
+.modal-btn {
+  padding: 9px 18px;
+  border-radius: 10px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--text-dim);
+  transition: all 0.15s ease;
+  font-family: inherit;
+}
+
+.modal-btn:hover {
+  background: var(--glass-strong);
+  color: var(--text);
+  border-color: var(--text-dim);
+}
+
+.modal-btn.confirm-btn {
+  background: var(--text);
+  color: var(--bg);
+  border-color: var(--text);
+}
+
+.modal-btn.confirm-btn:hover {
+  opacity: 0.9;
+}
+
+/* Modal Form Styles */
+.modal-form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 14px;
+}
+
+.modal-form-group label {
+  font-size: 10px;
+  color: var(--text-dim);
+  text-transform: uppercase;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+}
+
+.modal-input {
+  width: 100%;
+  background: var(--glass-strong);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 8px 12px;
+  font-size: 13px;
+  color: var(--text);
+  outline: none;
+  font-family: inherit;
+}
+
+.modal-input:focus {
+  border-color: var(--text-dim);
+}
+
+/* Modal Onboarding Styles */
+.modal-welcome-title {
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 24px;
+  font-weight: 700;
+  margin: 0 0 10px 0;
+  color: var(--text);
+  letter-spacing: -0.5px;
+}
+
+.modal-welcome-desc {
+  font-size: 13px;
+  color: var(--text-dim);
+  line-height: 1.4;
+  margin: 0;
+}
+
+.modal-welcome-list {
+  list-style: none;
+  padding: 0;
+  margin: 20px 0 0 0;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.modal-welcome-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  font-size: 13px;
+  line-height: 1.45;
+  color: var(--text);
+}
+
+.modal-welcome-icon {
+  font-size: 18px;
+  line-height: 1;
+  flex-shrink: 0;
+}
+
+.modal-welcome-text strong {
+  display: block;
+  font-weight: 600;
+  margin-bottom: 2px;
+}
+
+.modal-welcome-text span {
+  color: var(--text-dim);
+  font-size: 12px;
+}
+
+/* ==============================================================
+   Ghost Grid Shortcuts Visual Indicator
+   ============================================================== */
+.ghost-grid-indicator {
+  display: flex;
+  gap: 5px;
+  justify-content: center;
+  align-items: center;
+  margin-top: 14px;
+  cursor: pointer;
+  opacity: 0.18;
+  transition: opacity 0.22s ease, transform 0.22s ease;
+  pointer-events: auto;
+  height: 16px;
+  width: 60px;
+}
+
+.ghost-grid-indicator span {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--text);
+  transition: transform 0.22s ease, background-color 0.22s ease;
+}
+
+.ghost-grid-indicator:hover {
+  opacity: 0.7;
+}
+
+.ghost-grid-indicator.active {
+  opacity: 1;
+}
+
+.ghost-grid-indicator.active span {
+  background: var(--text);
+  box-shadow: 0 0 8px var(--text);
+}
+
+/* Correct the clock-view hover sequence in layout */
+.clock-view:hover .ghost-grid,
+.ghost-grid-indicator:hover~.ghost-grid {
+  opacity: 1;
+  pointer-events: auto;
+  transform: translateY(0);
+}
+
+
+
+/* ==============================================================
+   Focus Timer Presets & Session Streaks
+   ============================================================== */
+.timer-presets {
+  display: flex;
+  gap: 8px;
+  margin-top: 14px;
+  pointer-events: auto;
+  justify-content: center;
+  opacity: 1;
+  transition: opacity 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.preset-btn {
+  padding: 4px 10px;
+  border-radius: 8px;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  border: 1px solid var(--border);
+  background: var(--glass);
+  color: var(--text-dim);
+  transition: all 0.15s ease;
+  font-family: inherit;
+}
+
+.preset-btn:hover {
+  background: var(--glass-strong);
+  color: var(--text);
+  border-color: var(--text-dim);
+  transform: scale(1.05);
+}
+
+.timer-streak {
+  margin-top: 10px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-dim);
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  user-select: none;
+  opacity: 1;
+  transition: opacity 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Hide timer secondary details when actively running */
+.timer-running .timer-presets,
+.timer-running .timer-streak {
+  opacity: 0 !important;
+  pointer-events: none !important;
+}
+
+/* ==============================================================
+   Shortcut Dragging Visual Cue
+   ============================================================== */
+.shortcut-item.dragging {
+  opacity: 0.3;
+  transform: scale(0.95);
 }

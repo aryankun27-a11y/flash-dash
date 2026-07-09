@@ -9,8 +9,7 @@
   "permissions": [
     "storage",
     "unlimitedStorage",
-    "bookmarks",
-    "tabs"
+    "bookmarks"
   ],
   "icons": {
     "16": "icons/icon16.png",

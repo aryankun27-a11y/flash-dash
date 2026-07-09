@@ -1,6 +1,6 @@
 # ⚡ Flash Dash
 
-> A beautiful, distraction-free new tab extension for Chrome. Big clock, goal photos, tasks, and bookmarks — all in one sleek dashboard.
+> A premium, distraction-free, ultra-minimalist new tab extension for Chrome. High-fidelity glassmorphic cards, adaptive theme accenting, zero-distraction hidden sidebars, tasks list, bookmarks drawer, and a typographic Pomodoro timer.
 
 ![Manifest V3](https://img.shields.io/badge/Manifest-V3-blueviolet?style=flat-square)
 ![Chrome Extension](https://img.shields.io/badge/Chrome-Extension-4285F4?style=flat-square&logo=googlechrome&logoColor=white)
@@ -8,16 +8,16 @@
 
 ---
 
-## Features
+## Premium Core Features
 
 | Feature | Description |
 |---|---|
-| 🕐 **Clock & Focus Timer** | Large time display with AM/PM and date. Double-click the clock/background or press `Esc` to toggle **Focus Mode**, which activates a customizable countdown timer with interactive controls, progress-based background dimming, warm bell chime synthesis, and desktop notification alerts. |
-| 🖼️ **Photo Board** | Drag, resize, and layer goal/inspiration images, or drag-and-drop image files directly from your desktop. Features smart snapping to align centers and edges with nearby photos, and an interface lock. |
-| 🫥 **Ghost Grid Pinned Shortcuts** | Hover beneath the clock to reveal a hidden shortcut tile grid. Pin up to 8 custom web links with automatic favicon fetching. |
-| ✅ **Tasks** | Lightweight persistent to-do list on the right panel with dedicated grab handles for drag-and-drop reordering, and inline double-click editing. |
-| 🔖 **Bookmarks** | Slide-out bookmarks drawer with real-time text searching to quickly access all your Chrome bookmarks. |
-| 🌙 **Theme & Styling** | Sleek glassmorphic aesthetics. Dark / light mode toggle persisted across tabs. |
+| 🕐 **Typographic Focus Countdown** | Premium geometric display using `Plus Jakarta Sans` thin numerals. Double-click the background or clock to enter **Focus Mode**. Choose logically ordered presets (**5m, 10m, 25m, 50m**) that sync active states automatically. Includes a scale-down micro-tick animation on each second. |
+| 🫥 **Zero-Distraction Layout** | Both the left vertical toolbar and the right tasks card are fully hidden off-screen by default. Hovering near the screen edges reveals them with smooth cubic-bezier transitions. |
+| 🎨 **Adaptive Color Accent** | Calibrated color extraction algorithm draws your uploaded background image onto a hidden canvas, extracts the dominant HSL tone, and applies matching accent colors to all active buttons, checkmark boxes, and glowing details. |
+| 🖼️ **Goal Whiteboard** | Drag, resize, and layer inspiration images, or drag-and-drop image files directly from your desktop. Snaps alignment to screen margins. Toolbar overlays automatically hide during resizing/dragging to stay out of your way. |
+| 🫥 **Ghost Grid Shortcuts** | Hover beneath the date to reveal a hidden grid of quick web links with automatic favicon fetching. |
+| ✅ **Tasks & Bookmarks Drawer** | Slide-out panels with real-time text searching for Chrome bookmarks and a drag-and-drop to-do manager for tasks. |
 
 ---
 
@@ -25,9 +25,11 @@
 
 ### 🖱️ Gestures
 * **Double-click** background or clock to toggle Focus Mode.
-* **Hover** under the clock to reveal your Ghost Grid shortcuts.
+* **Hover Left Edge** to slide out the vertical toolbar and bookmarks/settings drawers.
+* **Hover Right Edge** to slide out the tasks card.
+* **Hover Under Clock** to reveal the Ghost Grid shortcuts.
 * **Drag & drop** image files from your computer to pin them directly to the whiteboard.
-* **Drag/Resize** whiteboard photos to align them. Edges and centers automatically snap to neighboring photos within a 12px range.
+* **Drag/Resize** photos; toolbars hide automatically and edge snaps align items seamlessly.
 
 ### ⌨️ Keybinds
 * <kbd>Esc</kbd> — Toggle Focus Mode (when inputs aren't focused) or close open drawers.
@@ -35,74 +37,29 @@
 * **Timer Shortcuts (Focus Mode Active)**:
   * <kbd>Space</kbd> — Play / Pause the countdown.
   * <kbd>R</kbd> — Reset the timer.
-  * <kbd>M</kbd> — Mute / Unmute completion sound.
-
----
-
-## Installation
-
-> No build step required — Flash Dash is pure HTML, CSS, and JavaScript.
-
-### 1. Download the files
-
-### 2. Open Chrome Extensions
-
-Navigate to `chrome://extensions` in your browser.
-
-### 3. Enable Developer Mode
-
-Toggle **Developer mode** in the top-right corner of the extensions page.
-
-### 4. Load the extension
-
-Click **Load unpacked** and select the `flash-dash/` folder (the one containing `manifest.json`).
-
-### 5. Open a new tab
-
-Press `Ctrl+T` — Flash Dash replaces the default new tab page.
-
----
-
-## Permissions
-
-The extension requests only the minimum permissions needed:
-
-| Permission | Why it's needed |
-|---|---|
-| `storage` | Persists tasks, theme preference, whiteboard layout locks, shortcuts, and background settings |
-| `unlimitedStorage` | Allows the database to save high-resolution background and whiteboard photos without browser storage limits |
-| `bookmarks` | Reads your Chrome bookmarks to populate the bookmarks drawer |
-| `tabs` | Required to query and navigate current tabs when you open a bookmark |
+  * <kbd>M</kbd> — Mute / Unmute completion chime sound.
 
 ---
 
 ## Project Structure
 
+No build step required — Flash Dash is pure HTML, CSS, and modular JavaScript.
+
 ```
 flash-dash/
 ├── manifest.json       # Chrome Extension Manifest V3 config
-├── newtab.html         # New tab page markup (loaded by Chrome on Ctrl+T)
-├── style.css           # All styles — design tokens, layout, components
-├── script.js           # All dashboard runtime logic — clock, photos, tasks, etc.
-├── icons/
-│   ├── icon16.png      # Toolbar icon (16×16)
-│   ├── icon48.png      # Extensions page icon (48×48)
-│   └── icon128.png     # Chrome Web Store icon (128×128)
-└── README.md           # This file
+├── newtab.html         # Onboarding cards, layouts, and DOM structure
+├── style.css           # Glassmorphic tokens, transitions, and indicators
+├── storage.js          # IndexedDB wrapper and chrome.storage sync loops
+├── ui.js               # Sidebars reveal event listeners & color extraction HSL logic
+├── whiteboard.js       # Drag, resize, photo snap calculations, and overlay freeze hooks
+├── timer.js            # Focus session states, presets, and tick animations
+├── modal.js            # Interactive onboarding modal card manager
+└── icons/
+    ├── icon16.png      # Toolbar icon (16×16)
+    ├── icon48.png      # Extensions page icon (48×48)
+    └── icon128.png     # Chrome Web Store icon (128×128)
 ```
-
----
-
-## Development
-
-### No build tooling needed
-
-Open any file directly in your editor. Changes are reflected immediately after reloading the extension:
-
-1. Edit a file
-2. Go to `chrome://extensions`
-3. Click the **↺ refresh** icon on the Flash Dash card
-4. Open a new tab
 
 ---
 
@@ -122,7 +79,7 @@ Lightweight configuration states and JSON objects. Key reference:
 |---|---|---|
 | `theme` | `"dark" \| "light"` | Current colour theme |
 | `tasks` | `Array<{text, done}>` | Task list |
-| `photos` | `Array<{id, xPercent, yPercent, w, h, z}>` | Whiteboard layout coordinates (in screen percentages), dimensions, and z-index layering |
+| `photos` | `Array<{id, xPercent, yPercent, w, h, z}>` | Whiteboard layout coordinates, dimensions, and layering |
 | `boardLocked` | `boolean` | Whether the photo whiteboard is locked |
 | `bgImage` | `"MIGRATED" \| null` | Migration state sentinel for background image |
 | `bgDim` | `number` | Overlay dimness percentage (0–90) |
@@ -141,12 +98,7 @@ Lightweight configuration states and JSON objects. Key reference:
 
 **Flash Dash collects zero personal data.**
 
-| What | Details |
-|---|---|
-| **Local storage only** | All configurations, shortcuts, and tasks are stored exclusively in `chrome.storage.local` on your own device |
-| **No servers** | Flash Dash has no backend, no analytics, no telemetry, and no accounts |
-| **No tracking** | No cookies, no fingerprinting, no usage tracking of any kind |
-| **Photos stay local** | Images you add to the board and background are stored locally as binary Blobs in IndexedDB — they are never uploaded anywhere |
-| **Bookmarks** | The extension reads your bookmarks locally via the Chrome API to display them in the drawer. They are never transmitted externally |
-
-This extension is designed to be fully auditable — the entire codebase is plain HTML, CSS, and JavaScript with no minification or obfuscation.
+* **Local storage only**: All configurations, shortcuts, and tasks are stored exclusively in local storage on your own device.
+* **No data portability exports/imports**: No data is packed or sent elsewhere.
+* **No servers**: Flash Dash has no backend, no analytics, no telemetry, and no tracking.
+* **Photos stay local**: Images you add to the board and background are stored locally as binary Blobs in IndexedDB — they are never uploaded anywhere.

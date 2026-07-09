@@ -35,29 +35,44 @@
   <nav class="vertical-toolbar" id="verticalToolbar">
     <div class="toolbar-group">
       <button class="task-btn" id="addPhotoBtn" title="Add Photo">
-        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="5" width="18" height="14" rx="2"/><circle cx="8.5" cy="10" r="1.5"/><path d="M21 16l-5-5-4 4-3-3-6 6"/></svg>
+        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8">
+          <rect x="3" y="5" width="18" height="14" rx="2" />
+          <circle cx="8.5" cy="10" r="1.5" />
+          <path d="M21 16l-5-5-4 4-3-3-6 6" />
+        </svg>
       </button>
 
       <button class="task-btn" id="bgSettingsToggleBtn" title="Screen Background">
-        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
+        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8">
+          <rect x="2" y="3" width="20" height="14" rx="2" ry="2" />
+          <line x1="8" y1="21" x2="16" y2="21" />
+          <line x1="12" y1="17" x2="12" y2="21" />
+        </svg>
       </button>
 
       <button class="task-btn" id="bookmarksToggle" title="Bookmarks">
-        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg>
+        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8">
+          <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z" />
+        </svg>
       </button>
 
       <button class="task-btn" id="lockBoardBtn" title="Lock Whiteboard">
-        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" id="lockIcon"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 9.9-1"/></svg>
+        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8"
+          id="lockIcon">
+          <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
+          <path d="M7 11V7a5 5 0 0 1 9.9-1" />
+        </svg>
       </button>
     </div>
 
     <div class="toolbar-bottom">
       <button class="task-btn" id="themeToggle" title="Toggle Theme">
-        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" id="themeIcon"><circle cx="12" cy="12" r="4.5"/></svg>
+        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8"
+          id="themeIcon">
+          <circle cx="12" cy="12" r="4.5" />
+        </svg>
       </button>
-      <button class="task-btn" id="helpToggleBtn" title="Help &amp; Gestures">
-        <span style="font-size: 16px; font-weight: 600; line-height: 1;">?</span>
-      </button>
+
     </div>
   </nav>
 
@@ -70,7 +85,8 @@
       <button id="closeBookmarks" class="drawer-close">&times;</button>
     </div>
     <div class="drawer-search-container">
-      <input type="text" id="bookmarkSearchInput" placeholder="Search bookmarks..." autocomplete="off" spellcheck="false" />
+      <input type="text" id="bookmarkSearchInput" placeholder="Search bookmarks..." autocomplete="off"
+        spellcheck="false" />
     </div>
     <ul class="bookmarks-list" id="bookmarksList">
       <!-- Dynamically populated bookmarks -->
@@ -80,7 +96,7 @@
   <!-- slide-out background settings drawer -->
   <div class="bookmarks-drawer" id="bgSettingsDrawer">
     <div class="drawer-header">
-      <span class="drawer-title">Screen Background</span>
+      <span class="drawer-title">Screen &amp; Data Settings</span>
       <button id="closeBgSettings" class="drawer-close">&times;</button>
     </div>
     <div class="drawer-content bg-settings-content">
@@ -90,7 +106,7 @@
         <span class="bg-drop-text">Drag & drop background or <span class="browse-link">browse</span></span>
         <input type="file" id="bgFileInput" accept="image/*" hidden />
       </div>
-      
+
       <!-- Controls -->
       <div class="control-group">
         <div class="control-label-row">
@@ -99,7 +115,7 @@
         </div>
         <input type="range" id="bgDimSlider" min="0" max="90" value="0" class="control-range" />
       </div>
-      
+
       <div class="control-group">
         <div class="control-label-row">
           <label for="bgBlurSlider">Background Blur</label>
@@ -107,35 +123,61 @@
         </div>
         <input type="range" id="bgBlurSlider" min="0" max="20" value="0" class="control-range" />
       </div>
-      
+
       <button id="clearBgBtn" class="bg-action-btn clear-bg-btn" disabled>Remove Background</button>
-      <button id="clearPhotosBtn" class="bg-action-btn clear-bg-btn" style="margin-top: 8px;" disabled>Clear Whiteboard Photos</button>
+      <button id="clearPhotosBtn" class="bg-action-btn clear-bg-btn" style="margin-top: 8px;" disabled>Clear Whiteboard
+        Photos</button>
     </div>
   </div>
 
   <!-- center clock/timer stage -->
   <main class="stage">
-    <!-- Standard Clock & Date View -->
-    <div class="clock-view" id="clockView">
-      <div class="clock">
-        <span id="time">00:00</span><span class="ampm" id="ampm">AM</span>
+    <div class="time-container">
+      <!-- Standard Clock & Date View -->
+      <div class="clock-view" id="clockView">
+        <div class="clock">
+          <span class="clock-hours" id="clockHours">00</span>
+          <span class="clock-colon">:</span>
+          <span class="clock-minutes" id="clockMinutes">00</span>
+          <span class="ampm" id="ampm">AM</span>
+        </div>
+        <div class="clock-details">
+          <div class="date" id="date">Loading…</div>
+          <div id="ghostGridIndicator" class="ghost-grid-indicator" title="Reveal Shortcuts">
+            <span></span><span></span><span></span>
+          </div>
+          <div class="ghost-grid" id="ghostGrid"></div>
+        </div>
       </div>
-      <div class="date" id="date">Loading…</div>
-    </div>
 
-    <!-- Focus Mode Countdown Timer View -->
-    <div class="timer-view" id="timerView">
-      <div class="timer-display-container">
-        <div class="timer-time" id="timerTime" title="Click to customize">25:00</div>
-        <input type="text" id="timerInput" class="timer-input" placeholder="25" maxlength="3" />
+      <!-- Focus Mode Countdown Timer View -->
+      <div class="timer-view" id="timerView">
+        <div class="timer-display-container">
+          <div class="timer-time" id="timerTime" title="Click to customize">
+            <span class="timer-hours" id="timerHours">25</span>
+            <span class="timer-colon">:</span>
+            <span class="timer-minutes" id="timerMinutes">00</span>
+          </div>
+          <input type="text" id="timerInput" class="timer-input" placeholder="25" maxlength="3" />
+        </div>
+        <div class="timer-controls">
+          <div class="timer-presets" id="timerPresets">
+            <button class="preset-btn" data-min="10">10m</button>
+            <button class="preset-btn" data-min="25">25m</button>
+            <button class="preset-btn" data-min="30">30m</button>
+            <button class="preset-btn" data-min="45">45m</button>
+            <button class="preset-btn" data-min="60">60m</button>
+          </div>
+          <div class="timer-streak" id="timerStreak">
+            Streak: <span id="timerStreakCount">0</span>
+          </div>
+          <div class="timer-shortcuts-help" id="timerShortcutsHelp">
+            [Space] Play/Pause • [R] Reset • [M] Mute
+          </div>
+          <button id="timerDoneBtn" class="timer-done-btn">Time's Up — Exit Focus</button>
+        </div>
       </div>
-      <div class="timer-shortcuts-help" id="timerShortcutsHelp">
-        [Space] Play/Pause  •  [R] Reset  •  [M] Mute
-      </div>
-      <button id="timerDoneBtn" class="timer-done-btn">Time's Up — Exit Focus</button>
     </div>
-
-    <div class="ghost-grid" id="ghostGrid"></div>
   </main>
 
   <!-- right control panel -->
@@ -159,37 +201,27 @@
     </section>
   </aside>
 
-  <!-- Help Overlay Drawer -->
-  <div class="bookmarks-drawer" id="helpDrawer">
-    <div class="drawer-header">
-      <span class="drawer-title">Help &amp; Shortcuts</span>
-      <button id="closeHelp" class="drawer-close">&times;</button>
-    </div>
-    <div class="drawer-content help-drawer-content">
-      <div class="help-section">
-        <h3>🖱️ Gestures</h3>
-        <ul>
-          <li><strong>Double-click</strong> background or clock to toggle Focus Mode.</li>
-          <li><strong>Hover</strong> under the clock to reveal your Ghost Grid shortcuts.</li>
-          <li><strong>Drag &amp; drop</strong> image files from your computer to add them.</li>
-          <li><strong>Drag</strong> whiteboard images freely — they snap to align with nearby photos.</li>
-          <li><strong>Drag edges</strong> of whiteboard images to resize them (snaps to neighbors).</li>
-        </ul>
-      </div>
-      <div class="help-section" style="margin-top: 16px;">
-        <h3>⌨️ Keyboard Keybinds</h3>
-        <ul>
-          <li><kbd>Esc</kbd> — Toggle Focus Mode (when inputs aren't focused).</li>
-          <li><kbd>Enter</kbd> — Save inline task edits or add a new task.</li>
-        </ul>
-      </div>
-    </div>
-  </div>
+
 
   <!-- Focus Notification Overlay -->
   <div id="focusNotification" class="focus-notification">Focus Mode Active</div>
 
-  <script src="script.js"></script>
+  <!-- Reusable Custom Modal Overlay -->
+  <div id="customModalOverlay" class="custom-modal-overlay">
+    <div class="custom-modal-card">
+      <div id="customModalContent"></div>
+      <div class="custom-modal-actions">
+        <button id="customModalCancelBtn" class="modal-btn cancel-btn">Cancel</button>
+        <button id="customModalConfirmBtn" class="modal-btn confirm-btn">Confirm</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="storage.js"></script>
+  <script src="modal.js"></script>
+  <script src="timer.js"></script>
+  <script src="whiteboard.js"></script>
+  <script src="ui.js"></script>
 </body>
 
 </html>
