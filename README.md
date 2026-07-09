@@ -12,8 +12,8 @@
 
 | Feature | Description |
 |---|---|
-| 🕐 **Focus Countdown** | Premium geometric display using `Plus Jakarta Sans` thin numerals. Double-click the background or clock to enter **Focus Mode**. Choose logically ordered presets (**5m, 10m, 25m, 50m**) that sync active states automatically. Includes a scale-down micro-tick animation on each second. |
-| 🖼️ **Goal Whiteboard** | Drag, resize, and layer inspiration images, or drag-and-drop image files directly from your desktop. Snaps alignment to screen margins. Toolbar overlays automatically hide during resizing/dragging to stay out of your way. |
+| 🕐 **Focus Countdown** | Premium geometric display using `Plus Jakarta Sans` thin numerals. Double-click the background or clock to enter **Focus Mode**. Choose logically ordered presets (**10m, 25m, 30m, 45m, 60m**) that sync active states automatically. Includes a scale-down micro-tick animation on each second. Prompts for notification permissions to show a desktop banner and play a chime when the session ends. |
+| 🖼️ **Goal Whiteboard** | Drag, resize, and layer inspiration images, or drag-and-drop image files directly from your desktop. Snaps alignment to screen margins. |
 | 🫥 **Ghost Grid Shortcuts** | Hover beneath the date to reveal a hidden grid of quick web links with automatic favicon fetching. |
 | ✅ **Tasks & Bookmarks Drawer** | Slide-out panels with real-time text searching for Chrome bookmarks and a drag-and-drop to-do manager for tasks. |
 | 🌙 **Theme Toggle** | Persistent light and dark theme mode toggle in the toolbar. |
@@ -26,7 +26,7 @@
 * **Double-click** background or clock to toggle Focus Mode.
 * **Hover Under Clock** to reveal the Ghost Grid shortcuts.
 * **Drag & drop** image files from your computer to pin them directly to the whiteboard.
-* **Drag/Resize** photos; toolbars hide automatically and edge snaps align items seamlessly.
+* **Drag/Resize** photos; edge snaps align items seamlessly.
 
 ### ⌨️ Keybinds
 * <kbd>Esc</kbd> — Toggle Focus Mode (when inputs aren't focused) or close open drawers.

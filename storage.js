@@ -10,10 +10,9 @@ class StorageQueue {
 }
 const storageQueue = new StorageQueue();
 
-// ---------- Unified Storage Interface (chrome.storage.sync with fallback) ----------
-// Determine storage destination (sync vs local vs localStorage)
-const useSync = window.chrome && chrome.storage && chrome.storage.sync;
-const chromeStore = useSync ? chrome.storage.sync : (window.chrome && chrome.storage && chrome.storage.local ? chrome.storage.local : null);
+// ---------- Unified Storage Interface (chrome.storage.local with fallback) ----------
+// Determine storage destination (local vs localStorage)
+const chromeStore = (window.chrome && chrome.storage && chrome.storage.local) ? chrome.storage.local : null;
 
 const store = {
   async get(key, fallback) {
@@ -30,22 +29,38 @@ const store = {
   async set(key, value) {
     if (chromeStore) {
       return new Promise(res => {
-        chromeStore.set({ [key]: value }, res);
+        chromeStore.set({ [key]: value }, () => {
+          if (chrome.runtime.lastError) {
+            console.error(`Flash Dash Storage Error: Failed to set key "${key}":`, chrome.runtime.lastError);
+          }
+          res();
+        });
       });
     }
-    try { localStorage.setItem(key, JSON.stringify(value)); } catch (e) { }
+    try {
+      localStorage.setItem(key, JSON.stringify(value));
+    } catch (e) {
+      console.error(`Flash Dash Storage Error: Failed to set key "${key}" in localStorage:`, e);
+    }
   },
   async setMultiple(obj) {
     if (chromeStore) {
       return new Promise(res => {
-        chromeStore.set(obj, res);
+        chromeStore.set(obj, () => {
+          if (chrome.runtime.lastError) {
+            console.error('Flash Dash Storage Error: Failed to set multiple keys:', chrome.runtime.lastError, obj);
+          }
+          res();
+        });
       });
     }
     try {
       for (const [k, v] of Object.entries(obj)) {
         localStorage.setItem(k, JSON.stringify(v));
       }
-    } catch (e) { }
+    } catch (e) {
+      console.error('Flash Dash Storage Error: Failed to set multiple keys in localStorage:', e);
+    }
   },
   // Mutator helper to serialize read-modify-write cycles
   async mutate(key, fallback, mutatorFn) {

@@ -1343,7 +1343,7 @@ body.focus-mode .stage {
   width: 100%;
 }
 
-.timer-hours {
+.timer-minutes {
   justify-self: end;
   text-align: right;
 }
@@ -1354,7 +1354,7 @@ body.focus-mode .stage {
   padding: 0 4px;
 }
 
-.timer-minutes {
+.timer-seconds {
   justify-self: start;
   text-align: left;
 }

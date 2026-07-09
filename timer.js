@@ -32,7 +32,6 @@ async function toggleFocusMode(e) {
       e.target.closest('.vertical-toolbar') ||
       e.target.closest('.bookmarks-drawer') ||
       e.target.closest('#bgSettingsDrawer') ||
-      e.target.closest('#helpDrawer') ||
       e.target.closest('#timerTime')) return;
   }
 
@@ -144,11 +143,11 @@ function updateTimerDisplay(ms) {
   const min = Math.floor(totalSec / 60);
   const sec = totalSec % 60;
 
-  const hoursEl = document.getElementById('timerHours');
   const minutesEl = document.getElementById('timerMinutes');
-  if (hoursEl && minutesEl) {
-    hoursEl.textContent = min.toString().padStart(2, '0');
-    minutesEl.textContent = sec.toString().padStart(2, '0');
+  const secondsEl = document.getElementById('timerSeconds');
+  if (minutesEl && secondsEl) {
+    minutesEl.textContent = min.toString().padStart(2, '0');
+    secondsEl.textContent = sec.toString().padStart(2, '0');
   } else {
     timerTime.textContent = `${min.toString().padStart(2, '0')}:${sec.toString().padStart(2, '0')}`;
   }
@@ -397,9 +396,8 @@ document.addEventListener('keydown', (e) => {
     let drawerClosed = false;
     const bookmarksDrawer = document.getElementById('bookmarksDrawer');
     const bgSettingsDrawer = document.getElementById('bgSettingsDrawer');
-    const helpDrawer = document.getElementById('helpDrawer');
 
-    [bookmarksDrawer, bgSettingsDrawer, helpDrawer].forEach(drawer => {
+    [bookmarksDrawer, bgSettingsDrawer].forEach(drawer => {
       if (drawer && drawer.classList.contains('open')) {
         drawer.classList.remove('open');
         drawerClosed = true;
@@ -499,8 +497,14 @@ if (presetContainer) {
 // Expose variables globally
 window.initTimer = initTimer;
 window.initFocusMode = initFocusMode;
-window.timerState = timerState;
-window.timerRemainingMs = timerRemainingMs;
+Object.defineProperty(window, 'timerState', {
+  get: () => timerState,
+  configurable: true
+});
+Object.defineProperty(window, 'timerRemainingMs', {
+  get: () => timerRemainingMs,
+  configurable: true
+});
 window.resetTimer = resetTimer;
 window.timerTime = timerTime;
 window.timerView = timerView;

@@ -31,8 +31,10 @@ function getDragAfterShortcut(container, x) {
 // ---------- favicon helper ----------
 function faviconUrl(url) {
   try {
-    const u = new URL(url);
-    return `https://www.google.com/s2/favicons?sz=64&domain=${u.hostname}`;
+    if (window.chrome && chrome.runtime && chrome.runtime.id) {
+      return `chrome-extension://${chrome.runtime.id}/_favicon/?pageUrl=${encodeURIComponent(url)}&size=64`;
+    }
+    return '';
   } catch (e) { return ''; }
 }
 

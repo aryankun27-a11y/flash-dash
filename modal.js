@@ -123,7 +123,7 @@ const ModalManager = {
             <span class="modal-welcome-icon">🕐</span>
             <div class="modal-welcome-text">
               <strong>Focus Countdown</strong>
-              <span>Double-click the background or clock to enter Focus Mode. Select duration presets (5m, 10m, 25m, 50m) with micro-tick animations.</span>
+              <span>Double-click the background or clock to enter Focus Mode. Select duration presets (10m, 25m, 30m, 45m, 60m) with micro-tick animations.</span>
             </div>
           </li>
           <li class="modal-welcome-item">
@@ -144,7 +144,7 @@ const ModalManager = {
             <span class="modal-welcome-icon">🖼️</span>
             <div class="modal-welcome-text">
               <strong>Snapping Goal Whiteboard</strong>
-              <span>Drag &amp; drop images directly. Resizing and dragging snaps borders. Overlay sidebars auto-hide during whiteboard adjustments.</span>
+              <span>Drag &amp; drop images directly. Resizing and dragging snaps borders.</span>
             </div>
           </li>
         </ul>
