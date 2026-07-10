@@ -79,7 +79,7 @@
   <input type="file" id="photoInput" accept="image/*" multiple hidden />
 
   <!-- slide-out bookmarks drawer (slides from left next to toolbar) -->
-  <div class="bookmarks-drawer" id="bookmarksDrawer">
+  <div class="slide-drawer" id="bookmarksDrawer">
     <div class="drawer-header">
       <span class="drawer-title">Bookmarks</span>
       <button id="closeBookmarks" class="drawer-close">&times;</button>
@@ -94,12 +94,12 @@
   </div>
 
   <!-- slide-out background settings drawer -->
-  <div class="bookmarks-drawer" id="bgSettingsDrawer">
+  <div class="slide-drawer" id="bgSettingsDrawer">
     <div class="drawer-header">
       <span class="drawer-title">Screen &amp; Data Settings</span>
       <button id="closeBgSettings" class="drawer-close">&times;</button>
     </div>
-    <div class="drawer-content bg-settings-content">
+    <div class="bg-settings-content">
       <!-- Drop zone / Upload area -->
       <div class="bg-drop-zone" id="bgDropZone">
         <span class="bg-drop-icon">🖼️</span>
@@ -125,7 +125,7 @@
       </div>
 
       <button id="clearBgBtn" class="bg-action-btn clear-bg-btn" disabled>Remove Background</button>
-      <button id="clearPhotosBtn" class="bg-action-btn clear-bg-btn" style="margin-top: 8px;" disabled>Clear Whiteboard
+      <button id="clearPhotosBtn" class="bg-action-btn clear-bg-btn clear-whiteboard-btn" disabled>Clear Whiteboard
         Photos</button>
     </div>
   </div>
@@ -143,9 +143,6 @@
         </div>
         <div class="clock-details">
           <div class="date" id="date">Loading…</div>
-          <div id="ghostGridIndicator" class="ghost-grid-indicator" title="Reveal Shortcuts">
-            <span></span><span></span><span></span>
-          </div>
           <div class="ghost-grid" id="ghostGrid"></div>
         </div>
       </div>
@@ -216,12 +213,7 @@
       </div>
     </div>
   </div>
-
-  <script src="storage.js"></script>
-  <script src="modal.js"></script>
-  <script src="timer.js"></script>
-  <script src="whiteboard.js"></script>
-  <script src="ui.js"></script>
+  <script src="script.js"></script>
 </body>
 
 </html>
