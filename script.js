@@ -186,7 +186,7 @@ const ModalManager = {
   init() {
     this.confirmBtn.addEventListener('click', () => this.handleAction(true));
     this.cancelBtn.addEventListener('click', () => this.handleAction(false));
-    
+
     this.overlay.addEventListener('click', (e) => {
       if (e.target === this.overlay) {
         this.handleAction(false);
@@ -222,7 +222,21 @@ const ModalManager = {
   async confirm(message) {
     return new Promise((resolve) => {
       this.currentResolve = resolve;
-      this.content.innerHTML = `<div style="font-size: 14px; line-height: 1.5; font-weight: 500; text-align: center; margin: 10px 0;">${message}</div>`;
+      this.content.innerHTML = `
+        <div class="modal-confirm-wrapper">
+          <div class="modal-icon-header">
+            <div class="modal-icon-badge warning">
+              <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path>
+                <line x1="12" y1="9" x2="12" y2="13"></line>
+                <line x1="12" y1="17" x2="12.01" y2="17"></line>
+              </svg>
+            </div>
+            <h3 class="modal-title">Confirm Action</h3>
+          </div>
+          <div class="modal-desc">${message}</div>
+        </div>
+      `;
       this.confirmBtn.textContent = 'Confirm';
       this.cancelBtn.textContent = 'Cancel';
       this.overlay.classList.add('active');
@@ -232,7 +246,21 @@ const ModalManager = {
   async alert(message) {
     return new Promise((resolve) => {
       this.currentResolve = resolve;
-      this.content.innerHTML = `<div style="font-size: 14px; line-height: 1.5; font-weight: 500; text-align: center; margin: 10px 0;">${message}</div>`;
+      this.content.innerHTML = `
+        <div class="modal-confirm-wrapper">
+          <div class="modal-icon-header">
+            <div class="modal-icon-badge info">
+              <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                <circle cx="12" cy="12" r="10"></circle>
+                <line x1="12" y1="16" x2="12" y2="12"></line>
+                <line x1="12" y1="8" x2="12.01" y2="8"></line>
+              </svg>
+            </div>
+            <h3 class="modal-title">Notice</h3>
+          </div>
+          <div class="modal-desc">${message}</div>
+        </div>
+      `;
       this.confirmBtn.textContent = 'OK';
       this.cancelBtn.style.display = 'none';
       this.overlay.classList.add('active');
@@ -258,7 +286,7 @@ const ModalManager = {
 
       const titleInput = document.getElementById('shortcutTitleInput');
       const urlInput = document.getElementById('shortcutUrlInput');
-      
+
       setTimeout(() => titleInput.focus(), 50);
 
       const handleKey = (e) => {
@@ -359,7 +387,7 @@ function showFocusNotification(text) {
   focusNotification.classList.add('visible');
   focusTimeout = setTimeout(() => {
     focusNotification.classList.remove('visible');
-  }, 1500);
+  }, 2500);
 }
 
 async function toggleFocusMode(e) {
@@ -714,6 +742,10 @@ if (timerInput) {
   timerInput.addEventListener('blur', async () => {
     await saveTimerEditMode();
   });
+
+  timerInput.addEventListener('input', () => {
+    timerInput.value = timerInput.value.replace(/[^0-9]/g, '');
+  });
 }
 
 if (timerDoneBtn) {
@@ -729,6 +761,15 @@ document.addEventListener('dblclick', toggleFocusMode);
 
 document.addEventListener('keydown', (e) => {
   if (e.key === 'Escape') {
+    const modalOverlay = document.getElementById('customModalOverlay');
+    if (modalOverlay && modalOverlay.classList.contains('active')) {
+      return;
+    }
+    const tutorialOverlay = document.getElementById('tutorialOverlay');
+    if (tutorialOverlay && tutorialOverlay.classList.contains('visible')) {
+      return;
+    }
+
     const activeEl = document.activeElement;
     if (activeEl && (activeEl.tagName === 'INPUT' || activeEl.tagName === 'TEXTAREA' || activeEl.isContentEditable)) {
       return;
@@ -737,8 +778,9 @@ document.addEventListener('keydown', (e) => {
     let drawerClosed = false;
     const bookmarksDrawer = document.getElementById('bookmarksDrawer');
     const bgSettingsDrawer = document.getElementById('bgSettingsDrawer');
+    const todoDrawer = document.getElementById('todoDrawer');
 
-    [bookmarksDrawer, bgSettingsDrawer].forEach(drawer => {
+    [bookmarksDrawer, bgSettingsDrawer, todoDrawer].forEach(drawer => {
       if (drawer && drawer.classList.contains('open')) {
         drawer.classList.remove('open');
         drawerClosed = true;
@@ -752,6 +794,9 @@ document.addEventListener('keydown', (e) => {
 });
 
 document.addEventListener('keydown', async (e) => {
+  const modalOverlay = document.getElementById('customModalOverlay');
+  if (modalOverlay && modalOverlay.classList.contains('active')) return;
+
   if (!document.body.classList.contains('focus-mode')) return;
 
   const activeEl = document.activeElement;
@@ -1047,6 +1092,9 @@ function makeResizableAndDraggable(el, photo, onChange) {
       }
 
       function upResize() {
+        try {
+          el.releasePointerCapture(e.pointerId);
+        } catch (err) {}
         el.removeEventListener('pointermove', moveResize);
         el.removeEventListener('pointerup', upResize);
         clearSnapGuides();
@@ -1086,6 +1134,9 @@ function makeResizableAndDraggable(el, photo, onChange) {
       }
 
       function upDrag() {
+        try {
+          el.releasePointerCapture(e.pointerId);
+        } catch (err) {}
         el.removeEventListener('pointermove', moveDrag);
         el.removeEventListener('pointerup', upDrag);
         el.style.cursor = 'grab';
@@ -1217,8 +1268,10 @@ async function renderBoard() {
 addPhotoBtn.addEventListener('click', () => {
   const bookmarksDrawer = document.getElementById('bookmarksDrawer');
   const bgSettingsDrawer = document.getElementById('bgSettingsDrawer');
+  const todoDrawer = document.getElementById('todoDrawer');
   if (bookmarksDrawer) bookmarksDrawer.classList.remove('open');
   if (bgSettingsDrawer) bgSettingsDrawer.classList.remove('open');
+  if (todoDrawer) todoDrawer.classList.remove('open');
   photoInput.click();
 });
 
@@ -1482,7 +1535,9 @@ let cachedBookmarks = [];
 
 bookmarksToggle.addEventListener('click', () => {
   const bgSettingsDrawer = document.getElementById('bgSettingsDrawer');
+  const todoDrawer = document.getElementById('todoDrawer');
   if (bgSettingsDrawer) bgSettingsDrawer.classList.remove('open');
+  if (todoDrawer) todoDrawer.classList.remove('open');
   bookmarksDrawer.classList.toggle('open');
   if (bookmarksDrawer.classList.contains('open')) {
     bookmarkSearchInput.value = '';
@@ -1497,12 +1552,17 @@ closeBookmarks.addEventListener('click', () => {
 document.addEventListener('click', (e) => {
   const bgSettingsDrawer = document.getElementById('bgSettingsDrawer');
   const bgSettingsToggleBtn = document.getElementById('bgSettingsToggleBtn');
+  const todoDrawer = document.getElementById('todoDrawer');
+  const todoToggle = document.getElementById('todoToggle');
 
   if (bookmarksDrawer && !bookmarksDrawer.contains(e.target) && bookmarksToggle && !bookmarksToggle.contains(e.target)) {
     bookmarksDrawer.classList.remove('open');
   }
   if (bgSettingsDrawer && !bgSettingsDrawer.contains(e.target) && bgSettingsToggleBtn && !bgSettingsToggleBtn.contains(e.target)) {
     bgSettingsDrawer.classList.remove('open');
+  }
+  if (todoDrawer && !todoDrawer.contains(e.target) && todoToggle && !todoToggle.contains(e.target)) {
+    todoDrawer.classList.remove('open');
   }
 });
 
@@ -1601,204 +1661,255 @@ function renderBookmarksList(bookmarks) {
   });
 }
 
-const taskInput = document.getElementById('taskInput');
-const taskList = document.getElementById('taskList');
-const taskCount = document.getElementById('taskCount');
+// ==========================================
+// 6. TASKS / TO-DO LIST (todo.js)
+// ==========================================
 
-function renderTasks(tasks) {
-  taskList.innerHTML = '';
-  if (tasks.length === 0) {
-    const empty = document.createElement('div');
-    empty.className = 'task-empty';
-    empty.innerHTML = `<svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" stroke-width="1.5">
-      <path d="M9 11l3 3L22 4"/>
-      <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/>
-    </svg>
-    <span>All clear! Add your first task below.</span>`;
-    taskList.appendChild(empty);
+const todoToggle = document.getElementById('todoToggle');
+const todoDrawer = document.getElementById('todoDrawer');
+const closeTodo = document.getElementById('closeTodo');
+const todoInput = document.getElementById('todoInput');
+const todoPriority = document.getElementById('todoPriority');
+const addTodoBtn = document.getElementById('addTodoBtn');
+const todoListEl = document.getElementById('todoList');
+const todoCountEl = document.getElementById('todoCount');
+const todoBadge = document.getElementById('todoBadge');
+const clearCompletedTodoBtn = document.getElementById('clearCompletedTodo');
+
+let todos = [];
+
+if (todoToggle) {
+  todoToggle.addEventListener('click', () => {
+    const bgSettingsDrawer = document.getElementById('bgSettingsDrawer');
+    const bookmarksDrawer = document.getElementById('bookmarksDrawer');
+    if (bgSettingsDrawer) bgSettingsDrawer.classList.remove('open');
+    if (bookmarksDrawer) bookmarksDrawer.classList.remove('open');
+
+    todoDrawer.classList.toggle('open');
+    if (todoDrawer.classList.contains('open')) {
+      todoInput.focus();
+    }
+  });
+}
+
+if (closeTodo) {
+  closeTodo.addEventListener('click', () => {
+    todoDrawer.classList.remove('open');
+  });
+}
+
+async function initTodos() {
+  todos = await store.get('todos', []);
+  renderTodos();
+}
+
+async function saveTodos() {
+  await store.set('todos', todos);
+}
+
+
+function renderTodos() {
+  if (!todoListEl) return;
+  todoListEl.innerHTML = '';
+
+  const activeCount = todos.filter(t => !t.completed).length;
+  todoCountEl.textContent = `${activeCount} task${activeCount === 1 ? '' : 's'} left`;
+
+  if (todoBadge) {
+    todoBadge.textContent = activeCount;
+    if (activeCount > 0) {
+      todoBadge.classList.remove('hidden');
+    } else {
+      todoBadge.classList.add('hidden');
+    }
   }
-  tasks.forEach((task, idx) => {
-    const li = document.createElement('li');
-    li.className = 'task-item';
-    li.setAttribute('draggable', 'false');
-    li.dataset.index = idx;
 
+  if (todos.length === 0) {
+    const empty = document.createElement('div');
+    empty.className = 'bookmark-empty';
+    empty.textContent = 'No tasks found. Add one above!';
+    todoListEl.appendChild(empty);
+    return;
+  }
+
+  todos.forEach((todo) => {
+    const li = document.createElement('li');
+    li.className = 'todo-item';
+    if (todo.completed) li.classList.add('completed');
+    li.dataset.id = todo.id;
+    li.setAttribute('draggable', 'true');
+
+    // Drag handlers
     li.addEventListener('dragstart', (e) => {
       li.classList.add('dragging');
-      e.dataTransfer.setData('text/plain', idx);
+      e.dataTransfer.setData('text/plain', todo.id);
       e.dataTransfer.effectAllowed = 'move';
     });
 
     li.addEventListener('dragend', async () => {
       li.classList.remove('dragging');
-      li.setAttribute('draggable', 'false');
-      const items = [...taskList.querySelectorAll('.task-item')];
-
-      await store.mutate('tasks', [], (current) => {
-        return items.map(item => {
-          const index = parseInt(item.dataset.index);
-          return current[index];
-        });
-      });
-
-      const updatedTasks = await store.get('tasks', []);
-      updateCount(updatedTasks);
-      renderTasks(updatedTasks);
+      const itemElements = [...todoListEl.querySelectorAll('.todo-item')];
+      const newOrder = itemElements.map(el => {
+        const id = el.dataset.id;
+        return todos.find(t => t.id === id);
+      }).filter(Boolean);
+      todos = newOrder;
+      await saveTodos();
     });
 
-    const dragHandle = document.createElement('div');
-    dragHandle.className = 'task-drag-handle';
-    dragHandle.innerHTML = `<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><circle cx="9" cy="5" r="1" fill="currentColor"/><circle cx="9" cy="12" r="1" fill="currentColor"/><circle cx="9" cy="19" r="1" fill="currentColor"/><circle cx="15" cy="5" r="1" fill="currentColor"/><circle cx="15" cy="12" r="1" fill="currentColor"/><circle cx="15" cy="19" r="1" fill="currentColor"/></svg>`;
-
-    dragHandle.addEventListener('mousedown', () => li.setAttribute('draggable', 'true'));
-    dragHandle.addEventListener('mouseup', () => li.setAttribute('draggable', 'false'));
-    dragHandle.addEventListener('touchstart', () => li.setAttribute('draggable', 'true'));
-    dragHandle.addEventListener('touchend', () => li.setAttribute('draggable', 'false'));
-
-    const check = document.createElement('div');
-    check.className = 'task-check' + (task.done ? ' done' : '');
-    check.setAttribute('role', 'checkbox');
-    check.setAttribute('aria-checked', task.done ? 'true' : 'false');
-    check.setAttribute('tabindex', '0');
-
-    const toggleDone = async () => {
-      const current = await store.mutate('tasks', [], (tasks) => {
-        tasks[idx].done = !tasks[idx].done;
-        return tasks;
-      });
-      renderTasks(current);
-      updateCount(current);
-    };
-
-    check.addEventListener('click', toggleDone);
-    check.addEventListener('keydown', (e) => {
-      if (e.key === ' ' || e.key === 'Enter') {
-        e.preventDefault();
-        toggleDone();
-      }
-    });
-
-    const text = document.createElement('span');
-    text.className = 'task-text' + (task.done ? ' done' : '');
-    text.textContent = task.text;
-
-    text.addEventListener('dblclick', (e) => {
-      if (task.done) return;
+    // Checkbox
+    const cbContainer = document.createElement('div');
+    cbContainer.className = 'todo-checkbox-container';
+    const checkbox = document.createElement('div');
+    checkbox.className = 'todo-checkbox';
+    checkbox.addEventListener('click', async (e) => {
       e.stopPropagation();
+      todo.completed = !todo.completed;
+      await saveTodos();
+      renderTodos();
+    });
+    cbContainer.appendChild(checkbox);
+    li.appendChild(cbContainer);
 
-      const editInput = document.createElement('input');
-      editInput.type = 'text';
-      editInput.className = 'task-edit-input';
-      editInput.value = task.text;
+    // Content (Text & Badges)
+    const content = document.createElement('div');
+    content.className = 'todo-content';
 
-      li.replaceChild(editInput, text);
-      editInput.focus();
-      editInput.select();
+    const textSpan = document.createElement('span');
+    textSpan.className = 'todo-text';
+    textSpan.textContent = todo.text;
+    textSpan.title = 'Double-click to edit';
 
-      editInput.addEventListener('mousedown', (ev) => ev.stopPropagation());
-      editInput.addEventListener('click', (ev) => ev.stopPropagation());
-      editInput.addEventListener('dblclick', (ev) => ev.stopPropagation());
+    // Double-click edit handler
+    textSpan.addEventListener('dblclick', (e) => {
+      if (todo.completed) return;
 
-      let finished = false;
-      async function finishEdit() {
-        if (finished) return;
-        finished = true;
-        const newText = editInput.value.trim();
-        if (newText && newText !== task.text) {
-          task.text = newText;
-          text.textContent = newText;
-          li.replaceChild(text, editInput);
+      const input = document.createElement('input');
+      input.type = 'text';
+      input.className = 'todo-edit-input';
+      input.value = todo.text;
+      input.maxLength = 120;
+      input.spellcheck = false;
 
-          await store.mutate('tasks', [], (tasks) => {
-            tasks[idx].text = newText;
-            return tasks;
-          });
-        } else {
-          li.replaceChild(text, editInput);
+      const saveEdit = async () => {
+        const val = input.value.trim();
+        if (val && val !== todo.text) {
+          todo.text = val;
+          await saveTodos();
         }
-      }
+        renderTodos();
+      };
 
-      editInput.addEventListener('keydown', (e) => {
-        if (e.key === 'Enter') {
-          e.preventDefault();
-          finishEdit();
-        } else if (e.key === 'Escape') {
-          e.preventDefault();
-          li.replaceChild(text, editInput);
-          finished = true;
+      input.addEventListener('keydown', async (ev) => {
+        if (ev.key === 'Enter') {
+          await saveEdit();
+        } else if (ev.key === 'Escape') {
+          renderTodos();
         }
       });
 
-      editInput.addEventListener('blur', finishEdit);
-    });
-
-    const del = document.createElement('span');
-    del.className = 'task-del';
-    del.textContent = '×';
-    del.addEventListener('click', async () => {
-      const current = await store.mutate('tasks', [], (tasks) => {
-        tasks.splice(idx, 1);
-        return tasks;
+      input.addEventListener('blur', async () => {
+        await saveEdit();
       });
-      renderTasks(current);
-      updateCount(current);
+
+      textSpan.replaceWith(input);
+      input.focus();
+      input.select();
     });
 
-    li.appendChild(dragHandle);
-    li.appendChild(check);
-    li.appendChild(text);
-    li.appendChild(del);
-    taskList.appendChild(li);
+    content.appendChild(textSpan);
+
+    // Metadata Row
+    const metaRow = document.createElement('div');
+    metaRow.className = 'todo-meta';
+
+    // Priority Badge
+    const priorityBadge = document.createElement('span');
+    priorityBadge.className = `priority-badge priority-${todo.priority}`;
+    priorityBadge.textContent = todo.priority;
+    metaRow.appendChild(priorityBadge);
+
+    content.appendChild(metaRow);
+    li.appendChild(content);
+
+    // Delete Button
+    const delBtn = document.createElement('button');
+    delBtn.className = 'todo-delete';
+    delBtn.innerHTML = '&times;';
+    delBtn.title = 'Delete Task';
+    delBtn.addEventListener('click', async (e) => {
+      e.stopPropagation();
+      todos = todos.filter(t => t.id !== todo.id);
+      await saveTodos();
+      renderTodos();
+    });
+    li.appendChild(delBtn);
+
+    todoListEl.appendChild(li);
   });
 }
 
-taskList.addEventListener('dragover', (e) => {
-  e.preventDefault();
-  const draggingEl = taskList.querySelector('.task-item.dragging');
-  if (!draggingEl) return;
-  const afterElement = getDragAfterElement(taskList, e.clientY, '.task-item');
-  if (afterElement == null) {
-    taskList.appendChild(draggingEl);
-  } else {
-    taskList.insertBefore(draggingEl, afterElement);
-  }
-});
-
-function updateCount(tasks) {
-  const left = tasks.filter(t => !t.done).length;
-  taskCount.textContent = `${left} left`;
-}
-
-async function initTasks() {
-  const tasks = await store.get('tasks', []);
-  renderTasks(tasks);
-  updateCount(tasks);
-}
-
-taskInput.addEventListener('keydown', async (e) => {
-  if (e.key !== 'Enter') return;
-  const text = taskInput.value.trim();
+async function handleAddTodo() {
+  const text = todoInput.value.trim();
   if (!text) return;
 
-  const current = await store.mutate('tasks', [], (tasks) => {
-    tasks.push({ text, done: false });
-    return tasks;
+  const priority = todoPriority.value;
+
+  const newTodo = {
+    id: 'todo_' + Date.now() + Math.random().toString(36).slice(2),
+    text: text,
+    completed: false,
+    priority: priority
+  };
+
+  todos.push(newTodo);
+  await saveTodos();
+  renderTodos();
+
+  // Reset inputs
+  todoInput.value = '';
+  todoPriority.value = 'medium';
+}
+
+if (addTodoBtn) {
+  addTodoBtn.addEventListener('click', handleAddTodo);
+}
+if (todoInput) {
+  todoInput.addEventListener('keydown', async (e) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      await handleAddTodo();
+    }
   });
-  taskInput.value = '';
-  renderTasks(current);
-  updateCount(current);
-});
+}
 
-const clearCompletedBtn = document.getElementById('clearCompletedBtn');
-clearCompletedBtn.addEventListener('click', async () => {
-  const current = await store.get('tasks', []);
-  const incomplete = current.filter(t => !t.done);
-  if (current.length === incomplete.length) return;
+if (clearCompletedTodoBtn) {
+  clearCompletedTodoBtn.addEventListener('click', async () => {
+    const completedCount = todos.filter(t => t.completed).length;
+    if (completedCount === 0) return;
 
-  await store.set('tasks', incomplete);
-  renderTasks(incomplete);
-  updateCount(incomplete);
-});
+    const confirmed = await ModalManager.confirm(`Clear all ${completedCount} completed task${completedCount === 1 ? '' : 's'}?`);
+    if (!confirmed) return;
+
+    todos = todos.filter(t => !t.completed);
+    await saveTodos();
+    renderTodos();
+  });
+}
+
+if (todoListEl) {
+  todoListEl.addEventListener('dragover', (e) => {
+    e.preventDefault();
+    const draggingEl = todoListEl.querySelector('.todo-item.dragging');
+    if (!draggingEl) return;
+    const afterElement = getDragAfterElement(todoListEl, e.clientY, '.todo-item');
+    if (afterElement == null) {
+      todoListEl.appendChild(draggingEl);
+    } else {
+      todoListEl.insertBefore(draggingEl, afterElement);
+    }
+  });
+}
 
 const themeToggle = document.getElementById('themeToggle');
 const themeIcon = document.getElementById('themeIcon');
@@ -2033,6 +2144,8 @@ const screenBgContainer = document.getElementById('screenBgContainer');
 const screenBgOverlay = document.getElementById('screenBgOverlay');
 
 bgSettingsToggleBtn.addEventListener('click', () => {
+  const todoDrawer = document.getElementById('todoDrawer');
+  if (todoDrawer) todoDrawer.classList.remove('open');
   bookmarksDrawer.classList.remove('open');
   bgSettingsDrawer.classList.toggle('open');
 });
@@ -2143,16 +2256,36 @@ function applyBgImage(src) {
     URL.revokeObjectURL(bgObjectUrl);
     bgObjectUrl = null;
   }
+  const container = document.getElementById('screenBgContainer');
+  if (!container) return;
+
   if (src) {
+    let targetUrl = '';
     if (src instanceof Blob) {
       bgObjectUrl = URL.createObjectURL(src);
-      screenBgContainer.style.backgroundImage = `url(${bgObjectUrl})`;
+      targetUrl = bgObjectUrl;
     } else {
-      screenBgContainer.style.backgroundImage = `url(${src})`;
+      targetUrl = src;
     }
+
+    // Trigger smooth fade transition by preloading the image
+    const tempImg = new Image();
+    tempImg.onload = () => {
+      container.style.opacity = '0';
+      setTimeout(() => {
+        container.style.backgroundImage = `url(${targetUrl})`;
+        container.style.opacity = '1';
+      }, 250);
+    };
+    tempImg.src = targetUrl;
+
     clearBgBtn.removeAttribute('disabled');
   } else {
-    screenBgContainer.style.backgroundImage = 'none';
+    container.style.opacity = '0';
+    setTimeout(() => {
+      container.style.backgroundImage = 'none';
+      container.style.opacity = '1';
+    }, 250);
     clearBgBtn.setAttribute('disabled', 'true');
   }
 }
@@ -2285,20 +2418,6 @@ async function migrateLegacyData() {
 async function startupInit() {
   await migrateLegacyData();
   await initBackground();
-
-  const currentTasks = await store.get('tasks', []);
-  const onboardingTexts = [
-    "Welcome to Flash Dash!",
-    "Double-click the clock",
-    "Hover under the clock",
-    "Drag & drop image files"
-  ];
-  const filteredTasks = currentTasks.filter(t => !onboardingTexts.some(ot => t.text.includes(ot)));
-  if (filteredTasks.length !== currentTasks.length) {
-    await store.set('tasks', filteredTasks);
-  }
-
-  await initTasks();
   await initTheme();
 
   if (typeof initFocusMode === 'function') {
@@ -2307,15 +2426,10 @@ async function startupInit() {
 
   await loadShortcuts();
   await initLockState();
+  await initTodos();
 
   if (typeof renderBoard === 'function') {
     await renderBoard();
-  }
-
-  const onboardingCompleted = await store.get('onboardingCompleted', false);
-  if (!onboardingCompleted) {
-    await ModalManager.showWelcomeModal();
-    await store.set('onboardingCompleted', true);
   }
 }
 
@@ -2344,7 +2458,335 @@ function tickClock() {
   if (dateEl) dateEl.textContent = dateStr;
 }
 
+function initSearch() {
+  const searchInput = document.getElementById('searchInput');
+  const suggestionsContainer = document.getElementById('suggestionsContainer');
+  const searchWrapper = document.getElementById('searchWrapper');
+
+  if (!searchInput || !suggestionsContainer) return;
+
+  let debounceTimer = null;
+  let suggestions = [];
+  let selectedIndex = -1;
+
+  function executeSearch(query) {
+    if (!query) return;
+    if (window.chrome && chrome.search && chrome.search.query) {
+      chrome.search.query({
+        text: query,
+        disposition: 'CURRENT_TAB'
+      }, () => {
+        if (chrome.runtime.lastError) {
+          console.error("Chrome search API error:", chrome.runtime.lastError);
+          window.location.href = `https://www.google.com/search?q=${encodeURIComponent(query)}`;
+        }
+      });
+    } else {
+      window.location.href = `https://www.google.com/search?q=${encodeURIComponent(query)}`;
+    }
+  }
+
+  function fallbackMockTopSites() {
+    suggestions = [
+      { title: "Google", url: "https://google.com", type: "topsite" },
+      { title: "YouTube", url: "https://youtube.com", type: "topsite" },
+      { title: "GitHub", url: "https://github.com", type: "bookmark" },
+      { title: "Gmail", url: "https://mail.google.com", type: "topsite" },
+      { title: "ChatGPT", url: "https://chatgpt.com", type: "topsite" }
+    ];
+    renderSuggestions();
+  }
+
+  function fallbackMockSuggestions(query) {
+    const mockSites = [
+      { title: "Google Translate", url: "https://translate.google.com", type: "topsite" },
+      { title: "GitHub Code", url: "https://github.com", type: "bookmark" },
+      { title: "Reddit", url: "https://reddit.com", type: "topsite" },
+      { title: "Wikipedia", url: "https://wikipedia.org", type: "topsite" },
+      { title: "Google Docs", url: "https://docs.google.com", type: "bookmark" },
+      { title: "Netflix", url: "https://netflix.com", type: "topsite" },
+      { title: "Amazon Shop", url: "https://amazon.com", type: "topsite" }
+    ];
+
+    suggestions = mockSites
+      .filter(item => {
+        const q = query.toLowerCase();
+        return item.title.toLowerCase().includes(q) || item.url.toLowerCase().includes(q);
+      })
+      .slice(0, 6);
+
+    renderSuggestions();
+  }
+
+  async function fetchSuggestions(query) {
+    if (!query) {
+      if (window.chrome && chrome.topSites && chrome.topSites.get) {
+        chrome.topSites.get((topSites) => {
+          suggestions = (topSites || []).slice(0, 6).map(t => ({
+            title: t.title || t.url,
+            url: t.url,
+            type: 'topsite'
+          }));
+          renderSuggestions();
+        });
+      } else {
+        fallbackMockTopSites();
+      }
+      return;
+    }
+
+    const getBookmarks = () => {
+      return new Promise((resolve) => {
+        if (window.chrome && chrome.bookmarks && chrome.bookmarks.search) {
+          chrome.bookmarks.search(query, (bookmarks) => {
+            resolve((bookmarks || [])
+              .filter(b => b.url)
+              .map(b => ({
+                title: b.title || b.url,
+                url: b.url,
+                type: 'bookmark'
+              }))
+            );
+          });
+        } else {
+          const mock = [
+            { title: 'Google', url: 'https://google.com' },
+            { title: 'Brave Search', url: 'https://search.brave.com' },
+            { title: 'GitHub', url: 'https://github.com' },
+            { title: 'Hacker News', url: 'https://news.ycombinator.com' },
+            { title: 'YouTube', url: 'https://youtube.com' }
+          ];
+          const matched = mock.filter(item => {
+            const q = query.toLowerCase();
+            return item.title.toLowerCase().includes(q) || item.url.toLowerCase().includes(q);
+          }).map(item => ({ ...item, type: 'bookmark' }));
+          resolve(matched);
+        }
+      });
+    };
+
+    const getTopSites = () => {
+      return new Promise((resolve) => {
+        if (window.chrome && chrome.topSites && chrome.topSites.get) {
+          chrome.topSites.get((topSites) => {
+            resolve((topSites || [])
+              .map(t => ({
+                title: t.title || t.url,
+                url: t.url,
+                type: 'topsite'
+              }))
+              .filter(t => {
+                const q = query.toLowerCase();
+                return t.title.toLowerCase().includes(q) || t.url.toLowerCase().includes(q);
+              })
+            );
+          });
+        } else {
+          const mockSites = [
+            { title: "Google Translate", url: "https://translate.google.com" },
+            { title: "Reddit", url: "https://reddit.com" },
+            { title: "Wikipedia", url: "https://wikipedia.org" },
+            { title: "Netflix", url: "https://netflix.com" },
+            { title: "Amazon Shop", url: "https://amazon.com" }
+          ];
+          const matched = mockSites.filter(item => {
+            const q = query.toLowerCase();
+            return item.title.toLowerCase().includes(q) || item.url.toLowerCase().includes(q);
+          }).map(item => ({ ...item, type: 'topsite' }));
+          resolve(matched);
+        }
+      });
+    };
+
+    const getGoogleSuggestions = () => {
+      return new Promise((resolve) => {
+        if (window.chrome && chrome.runtime && chrome.runtime.sendMessage) {
+          chrome.runtime.sendMessage({ action: 'fetchSuggestions', query }, (response) => {
+            if (response && response.success && response.data && Array.isArray(response.data[1])) {
+              resolve(response.data[1].map(text => ({
+                title: text,
+                url: `https://www.google.com/search?q=${encodeURIComponent(text)}`,
+                type: 'search'
+              })));
+            } else {
+              resolve([]);
+            }
+          });
+        } else {
+          const mockQueries = [
+            "how to program", "weather tomorrow", "javascript tutorial", 
+            "what is anti-gravity", "antigravity deepmind", "best developer tools"
+          ];
+          const matched = mockQueries
+            .filter(q => q.toLowerCase().includes(query.toLowerCase()))
+            .map(text => ({
+              title: text,
+              url: `https://www.google.com/search?q=${encodeURIComponent(text)}`,
+              type: 'search'
+            }));
+          resolve(matched);
+        }
+      });
+    };
+
+    Promise.all([getBookmarks(), getTopSites(), getGoogleSuggestions()]).then(([bookmarks, topSites, googleQueries]) => {
+      if (searchInput.value.trim() !== query) return;
+
+      let combined = [...bookmarks, ...topSites, ...googleQueries];
+      let seen = new Set();
+      suggestions = combined.filter(item => {
+        const key = item.type === 'search' ? `search:${item.title.toLowerCase()}` : item.url.replace(/\/$/, "").toLowerCase();
+        if (seen.has(key)) return false;
+        seen.add(key);
+        return true;
+      }).slice(0, 6);
+
+      renderSuggestions();
+    });
+  }
+
+  function renderSuggestions() {
+    suggestionsContainer.innerHTML = '';
+    if (suggestions.length === 0) {
+      hideSuggestions();
+      return;
+    }
+
+    suggestions.forEach((item, index) => {
+      const div = document.createElement('div');
+      div.className = 'suggestion-item';
+      if (index === selectedIndex) {
+        div.classList.add('selected');
+      }
+
+      let host = "";
+      let iconHtml = "";
+      let tagText = "";
+
+      if (item.type === 'search') {
+        host = "Google Search";
+        tagText = "";
+        iconHtml = `
+          <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="color: var(--text-dim);">
+            <circle cx="11" cy="11" r="8"></circle>
+            <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+          </svg>
+        `;
+      } else {
+        try {
+          host = new URL(item.url).hostname;
+        } catch (e) {
+          host = item.url;
+        }
+        tagText = item.type === 'bookmark' ? '★' : '↗';
+        const faviconUrl = `https://www.google.com/s2/favicons?sz=32&domain_url=${encodeURIComponent(item.url)}`;
+        iconHtml = `<img src="${faviconUrl}" onerror="this.style.display='none';" />`;
+      }
+
+      div.innerHTML = `
+        <span class="suggestion-icon">
+          ${iconHtml}
+        </span>
+        <span class="suggestion-text-container">
+          <span class="suggestion-title">${escapeHtml(item.title)}</span>
+          <span class="suggestion-url">${escapeHtml(host)}</span>
+        </span>
+        <span class="suggestion-tag">${escapeHtml(tagText)}</span>
+      `;
+
+      div.addEventListener('click', () => {
+        window.location.href = item.url;
+        hideSuggestions();
+      });
+
+      suggestionsContainer.appendChild(div);
+    });
+
+    suggestionsContainer.classList.add('visible');
+  }
+
+  function hideSuggestions() {
+    suggestionsContainer.classList.remove('visible');
+    suggestions = [];
+    selectedIndex = -1;
+  }
+
+  function escapeHtml(str) {
+    return str
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;")
+      .replace(/'/g, "&#039;");
+  }
+
+  searchInput.addEventListener('input', () => {
+    const val = searchInput.value.trim();
+    selectedIndex = -1;
+    clearTimeout(debounceTimer);
+    debounceTimer = setTimeout(() => {
+      fetchSuggestions(val);
+    }, 150);
+  });
+
+  searchInput.addEventListener('focus', () => {
+    document.body.classList.add('search-focused');
+    const val = searchInput.value.trim();
+    fetchSuggestions(val);
+  });
+
+  searchInput.addEventListener('blur', () => {
+    document.body.classList.remove('search-focused');
+    setTimeout(() => {
+      if (document.activeElement !== searchInput) {
+        hideSuggestions();
+      }
+    }, 200);
+  });
+
+  searchInput.addEventListener('keydown', (e) => {
+    if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      if (suggestions.length > 0) {
+        selectedIndex = (selectedIndex + 1) % suggestions.length;
+        renderSuggestions();
+        searchInput.value = suggestions[selectedIndex].title;
+      }
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      if (suggestions.length > 0) {
+        selectedIndex = (selectedIndex - 1 + suggestions.length) % suggestions.length;
+        renderSuggestions();
+        searchInput.value = suggestions[selectedIndex].title;
+      }
+    } else if (e.key === 'Escape') {
+      e.preventDefault();
+      hideSuggestions();
+      searchInput.blur();
+    } else if (e.key === 'Enter') {
+      e.preventDefault();
+      if (selectedIndex >= 0 && selectedIndex < suggestions.length) {
+        window.location.href = suggestions[selectedIndex].url;
+      } else {
+        const finalQuery = searchInput.value.trim();
+        executeSearch(finalQuery);
+      }
+      hideSuggestions();
+    }
+  });
+
+  const searchOverlay = document.getElementById('searchOverlay');
+  if (searchOverlay) {
+    searchOverlay.addEventListener('mousedown', (e) => {
+      e.preventDefault(); // Prevents instant blur layout shifts during mousedown
+      hideSuggestions();
+      searchInput.blur();
+    });
+  }
+}
+
 tickClock();
 setInterval(tickClock, 1000);
 
+initSearch();
 startupInit();
