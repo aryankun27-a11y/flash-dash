@@ -267,53 +267,6 @@ const ModalManager = {
     });
   },
 
-  async promptShortcut() {
-    return new Promise((resolve) => {
-      this.content.innerHTML = `
-        <div class="modal-welcome-title" style="font-size: 18px; margin-bottom: 12px;">Add Shortcut</div>
-        <div class="modal-form-group">
-          <label for="shortcutTitleInput">Name (Max 15 chars)</label>
-          <input type="text" id="shortcutTitleInput" class="modal-input" placeholder="e.g. Google" maxlength="15" autocomplete="off" />
-        </div>
-        <div class="modal-form-group" style="margin-top: 12px;">
-          <label for="shortcutUrlInput">URL</label>
-          <input type="text" id="shortcutUrlInput" class="modal-input" placeholder="e.g. google.com" autocomplete="off" />
-        </div>
-      `;
-      this.confirmBtn.textContent = 'Add';
-      this.cancelBtn.textContent = 'Cancel';
-      this.overlay.classList.add('active');
-
-      const titleInput = document.getElementById('shortcutTitleInput');
-      const urlInput = document.getElementById('shortcutUrlInput');
-
-      setTimeout(() => titleInput.focus(), 50);
-
-      const handleKey = (e) => {
-        if (e.key === 'Enter') {
-          e.preventDefault();
-          this.confirmBtn.click();
-        }
-      };
-      titleInput.addEventListener('keydown', handleKey);
-      urlInput.addEventListener('keydown', handleKey);
-
-      this.currentResolve = (confirmed) => {
-        if (confirmed) {
-          const title = titleInput.value.trim();
-          let url = urlInput.value.trim();
-          if (title && url) {
-            resolve({ title, url });
-          } else {
-            resolve(null);
-          }
-        } else {
-          resolve(null);
-        }
-      };
-    });
-  },
-
   async showWelcomeModal() {
     return new Promise((resolve) => {
       this.currentResolve = resolve;
@@ -904,9 +857,10 @@ const photoInput = document.getElementById('photoInput');
 const addPhotoBtn = document.getElementById('addPhotoBtn');
 const clearPhotosBtn = document.getElementById('clearPhotosBtn');
 
-let _photoZCounter = 10;
+let _photoZCounter = 100;
 let loadedPhotos = [];
 const photoObjectUrls = new Map();
+let _focusedPhotoEl = null; // Tracks the last clicked photo for keyboard delete
 
 async function updateClearPhotosBtnState() {
   if (!clearPhotosBtn) return;
@@ -954,7 +908,7 @@ function getResizeDirection(el, clientX, clientY) {
 }
 
 const SNAP_THRESHOLD = 12;
-const SNAP_GAP = 16;
+const SNAP_GAP = 0;
 
 function getOtherPhotoRects(excludeId) {
   const rects = [];
@@ -1106,6 +1060,7 @@ function makeResizableAndDraggable(el, photo, onChange) {
 
     } else {
       el.style.cursor = 'grabbing';
+      el.classList.add('dragging');
 
       function moveDrag(ev) {
         const dx = ev.clientX - startX;
@@ -1140,6 +1095,7 @@ function makeResizableAndDraggable(el, photo, onChange) {
         el.removeEventListener('pointermove', moveDrag);
         el.removeEventListener('pointerup', upDrag);
         el.style.cursor = 'grab';
+        el.classList.remove('dragging');
         clearSnapGuides();
         onChange();
       }
@@ -1157,7 +1113,7 @@ async function renderPhotoEl(photo) {
 
   updatePhotoPositionStyle(wrap, photo);
 
-  const savedZ = photo.z || 2;
+  const savedZ = photo.z || 100;
   wrap.style.zIndex = savedZ;
   if (savedZ > _photoZCounter) _photoZCounter = savedZ;
 
@@ -1227,7 +1183,14 @@ async function renderPhotoEl(photo) {
     wrap.style.zIndex = _photoZCounter;
     wrap.classList.add('photo-lifted');
     setTimeout(() => wrap.classList.remove('photo-lifted'), 350);
+    // Track this photo as the focused one for keyboard delete
+    _focusedPhotoEl = wrap;
     persist();
+  });
+
+  // Also set focused on mouseenter so hovering and pressing Delete works
+  wrap.addEventListener('mouseenter', () => {
+    _focusedPhotoEl = wrap;
   });
 
   makeResizableAndDraggable(wrap, photo, persist);
@@ -1483,6 +1446,34 @@ document.addEventListener('drop', async (e) => {
 window.renderBoard = renderBoard;
 window.addPhotos = addPhotos;
 
+// Keyboard Delete/Backspace to remove the focused/hovered photo
+document.addEventListener('keydown', async (e) => {
+  if (e.key !== 'Delete' && e.key !== 'Backspace') return;
+
+  // Don't fire if typing in an input, textarea, or editable element
+  const activeEl = document.activeElement;
+  if (activeEl && (activeEl.tagName === 'INPUT' || activeEl.tagName === 'TEXTAREA' || activeEl.isContentEditable)) return;
+
+  // Don't fire if a modal or tutorial is open
+  const modalOverlay = document.getElementById('customModalOverlay');
+  if (modalOverlay && modalOverlay.classList.contains('active')) return;
+  const tutorialOverlay = document.getElementById('tutorialOverlay');
+  if (tutorialOverlay && tutorialOverlay.classList.contains('visible')) return;
+
+  // Don't fire if board is locked
+  if (board && board.classList.contains('board-locked')) return;
+
+  if (!_focusedPhotoEl || !document.body.contains(_focusedPhotoEl)) return;
+
+  // Find the photo id and trigger its delete button
+  const delBtn = _focusedPhotoEl.querySelector('.del');
+  if (delBtn) {
+    e.preventDefault();
+    delBtn.click();
+    _focusedPhotoEl = null;
+  }
+});
+
 
 // ==========================================
 // 5. USER INTERFACE FLOW & INITIALIZATION (ui.js)
@@ -1502,19 +1493,6 @@ function getDragAfterElement(container, y, selector) {
   }, { offset: Number.NEGATIVE_INFINITY }).element;
 }
 
-function getDragAfterShortcut(container, x) {
-  const draggableElements = [...container.querySelectorAll('.shortcut-item:not(.dragging):not(.add-shortcut-btn)')];
-
-  return draggableElements.reduce((closest, child) => {
-    const box = child.getBoundingClientRect();
-    const offset = x - box.left - box.width / 2;
-    if (offset < 0 && offset > closest.offset) {
-      return { offset: offset, element: child };
-    } else {
-      return closest;
-    }
-  }, { offset: Number.NEGATIVE_INFINITY }).element;
-}
 
 function faviconUrl(url) {
   try {
@@ -1625,9 +1603,10 @@ function renderBookmarksList(bookmarks) {
     return;
   }
 
-  bookmarks.forEach(bm => {
+  bookmarks.forEach((bm, index) => {
     const a = document.createElement('a');
     a.className = 'bookmark-item';
+    a.style.setProperty('--item-index', index);
     a.href = bm.url;
     a.addEventListener('click', (e) => {
       if (e.metaKey || e.ctrlKey || e.button === 1) {
@@ -1732,9 +1711,10 @@ function renderTodos() {
     return;
   }
 
-  todos.forEach((todo) => {
+  todos.forEach((todo, index) => {
     const li = document.createElement('li');
     li.className = 'todo-item';
+    li.style.setProperty('--item-index', index);
     if (todo.completed) li.classList.add('completed');
     li.dataset.id = todo.id;
     li.setAttribute('draggable', 'true');
@@ -1935,171 +1915,6 @@ themeToggle.addEventListener('click', async () => {
   await store.set('theme', next);
 });
 
-const ghostGrid = document.getElementById('ghostGrid');
-
-const defaultShortcuts = [
-  { title: "Google", url: "https://google.com" },
-  { title: "GitHub", url: "https://github.com" },
-  { title: "YouTube", url: "https://youtube.com" }
-];
-
-async function loadShortcuts() {
-  const list = await store.get('shortcuts', defaultShortcuts);
-  renderShortcuts(list);
-}
-
-function renderShortcuts(shortcuts) {
-  if (!ghostGrid) return;
-  ghostGrid.innerHTML = '';
-
-  shortcuts.forEach((sc, idx) => {
-    const item = document.createElement('a');
-    item.className = 'shortcut-item';
-    item.href = sc.url;
-    item.title = sc.title;
-    item.setAttribute('draggable', 'true');
-    item.dataset.index = idx;
-
-    item.addEventListener('dragstart', (e) => {
-      item.classList.add('dragging');
-      e.dataTransfer.setData('text/plain', idx);
-      e.dataTransfer.effectAllowed = 'move';
-    });
-
-    item.addEventListener('dragend', async () => {
-      item.classList.remove('dragging');
-      const items = [...ghostGrid.querySelectorAll('.shortcut-item:not(.add-shortcut-btn)')];
-
-      await store.mutate('shortcuts', defaultShortcuts, (current) => {
-        return items.map(el => {
-          const index = parseInt(el.dataset.index);
-          return current[index];
-        });
-      });
-
-      const updatedShortcuts = await store.get('shortcuts', []);
-      renderShortcuts(updatedShortcuts);
-    });
-
-    item.addEventListener('click', (e) => {
-      if (e.metaKey || e.ctrlKey || e.button === 1) {
-        return;
-      }
-      e.preventDefault();
-      window.location.href = sc.url;
-    });
-
-    const tile = document.createElement('div');
-    tile.className = 'shortcut-tile';
-
-    const img = document.createElement('img');
-    img.className = 'shortcut-icon';
-    img.src = faviconUrl(sc.url);
-    img.alt = '';
-
-    img.onerror = () => {
-      img.remove();
-      const fallback = document.createElement('div');
-      fallback.className = 'shortcut-fallback';
-      fallback.textContent = sc.title ? sc.title.slice(0, 1).toUpperCase() : 'S';
-      tile.appendChild(fallback);
-    };
-
-    img.setAttribute('draggable', 'false');
-    tile.appendChild(img);
-
-    const del = document.createElement('span');
-    del.className = 'shortcut-del';
-    del.innerHTML = '&times;';
-    del.title = 'Delete Shortcut';
-    del.addEventListener('click', async (e) => {
-      e.preventDefault();
-      e.stopPropagation();
-      const confirmed = await ModalManager.confirm(`Delete shortcut for ${sc.title}?`);
-      if (!confirmed) return;
-
-      const current = await store.mutate('shortcuts', defaultShortcuts, (shortcuts) => {
-        shortcuts.splice(idx, 1);
-        return shortcuts;
-      });
-      renderShortcuts(current);
-    });
-    tile.appendChild(del);
-
-    item.appendChild(tile);
-
-    const label = document.createElement('span');
-    label.className = 'shortcut-label';
-    label.textContent = sc.title;
-    item.appendChild(label);
-
-    ghostGrid.appendChild(item);
-  });
-
-  if (shortcuts.length < 8) {
-    const addBtn = document.createElement('div');
-    addBtn.className = 'shortcut-item add-shortcut-btn';
-    addBtn.setAttribute('tabindex', '0');
-    addBtn.setAttribute('role', 'button');
-    addBtn.setAttribute('aria-label', 'Add Shortcut');
-
-    const tile = document.createElement('div');
-    tile.className = 'shortcut-tile';
-    tile.innerHTML = '<span style="font-size: 18px; font-weight: 500;">+</span>';
-    addBtn.appendChild(tile);
-
-    const label = document.createElement('span');
-    label.className = 'shortcut-label';
-    label.textContent = 'Add shortcut';
-    addBtn.appendChild(label);
-
-    const triggerAdd = async () => {
-      const shortcut = await ModalManager.promptShortcut();
-      if (!shortcut) return;
-
-      let { title, url } = shortcut;
-      url = url.trim();
-      if (!/^https?:\/\//i.test(url)) {
-        url = 'https://' + url;
-      }
-
-      const current = await store.mutate('shortcuts', defaultShortcuts, (shortcuts) => {
-        shortcuts.push({ title: title.slice(0, 15), url });
-        return shortcuts;
-      });
-      renderShortcuts(current);
-    };
-
-    addBtn.addEventListener('click', triggerAdd);
-    addBtn.addEventListener('keydown', (e) => {
-      if (e.key === ' ' || e.key === 'Enter') {
-        e.preventDefault();
-        triggerAdd();
-      }
-    });
-
-    ghostGrid.appendChild(addBtn);
-  }
-}
-
-if (ghostGrid) {
-  ghostGrid.addEventListener('dragover', (e) => {
-    e.preventDefault();
-    const draggingEl = ghostGrid.querySelector('.shortcut-item.dragging');
-    if (!draggingEl) return;
-    const afterElement = getDragAfterShortcut(ghostGrid, e.clientX);
-    const addShortcutBtn = ghostGrid.querySelector('.add-shortcut-btn');
-    if (afterElement == null) {
-      if (addShortcutBtn) {
-        ghostGrid.insertBefore(draggingEl, addShortcutBtn);
-      } else {
-        ghostGrid.appendChild(draggingEl);
-      }
-    } else {
-      ghostGrid.insertBefore(draggingEl, afterElement);
-    }
-  });
-}
 
 const lockBoardBtn = document.getElementById('lockBoardBtn');
 const lockIcon = document.getElementById('lockIcon');
@@ -2415,44 +2230,89 @@ async function migrateLegacyData() {
   }
 }
 
+function initMagneticToolbarButtons() {
+  const buttons = document.querySelectorAll('.vertical-toolbar .task-btn');
+  buttons.forEach((btn) => {
+    btn.addEventListener('mousemove', (e) => {
+      const rect = btn.getBoundingClientRect();
+      const centerX = rect.left + rect.width / 2;
+      const centerY = rect.top + rect.height / 2;
+      const dx = e.clientX - centerX;
+      const dy = e.clientY - centerY;
+      btn.style.transform = `translate(${dx * 0.28}px, ${dy * 0.28}px)`;
+    });
+
+    btn.addEventListener('mouseleave', () => {
+      btn.style.transform = 'translate(0px, 0px)';
+    });
+  });
+}
+
 async function startupInit() {
   await migrateLegacyData();
   await initBackground();
   await initTheme();
+  await initClock();
 
   if (typeof initFocusMode === 'function') {
     await initFocusMode();
   }
 
-  await loadShortcuts();
   await initLockState();
   await initTodos();
+  initMagneticToolbarButtons();
 
   if (typeof renderBoard === 'function') {
     await renderBoard();
   }
 }
 
+let is24HourClock = false;
+
+async function initClock() {
+  is24HourClock = await store.get('clock24HourFormat', false);
+  const clockView = document.getElementById('clockView');
+  if (clockView) {
+    clockView.addEventListener('click', async () => {
+      is24HourClock = !is24HourClock;
+      await store.set('clock24HourFormat', is24HourClock);
+      tickClock();
+      if (typeof showFocusNotification === 'function') {
+        showFocusNotification(is24HourClock ? "24-Hour Format Active" : "12-Hour Format Active");
+      }
+    });
+  }
+  tickClock();
+}
+
 function tickClock() {
   const now = new Date();
   let h = now.getHours();
   const m = now.getMinutes().toString().padStart(2, '0');
-  const ampm = h >= 12 ? 'PM' : 'AM';
-  h = h % 12; if (h === 0) h = 12;
+  let ampmStr = '';
+
+  if (is24HourClock) {
+    ampmStr = '';
+  } else {
+    ampmStr = h >= 12 ? 'PM' : 'AM';
+    h = h % 12;
+    if (h === 0) h = 12;
+  }
 
   const hoursEl = document.getElementById('clockHours');
   const minutesEl = document.getElementById('clockMinutes');
   if (hoursEl && minutesEl) {
-    hoursEl.textContent = h.toString().padStart(2, '0');
+    hoursEl.textContent = is24HourClock ? h.toString().padStart(2, '0') : h.toString().padStart(2, '0');
     minutesEl.textContent = m;
-  } else {
-    const timeSpan = document.getElementById('time');
-    if (timeSpan) timeSpan.textContent = `${h.toString().padStart(2, '0')}:${m}`;
   }
 
   const ampmSpan = document.getElementById('ampm');
-  if (ampmSpan) ampmSpan.textContent = ampm;
+  if (ampmSpan) {
+    ampmSpan.textContent = ampmStr;
+    ampmSpan.style.display = ampmStr ? 'inline' : 'none';
+  }
 
+  // Full date: "Friday, July 31"
   const dateStr = now.toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' });
   const dateEl = document.getElementById('date');
   if (dateEl) dateEl.textContent = dateStr;

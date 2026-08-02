@@ -61,8 +61,11 @@ body {
 .board {
   position: fixed;
   inset: 0;
-  z-index: 2;
+  z-index: 50;
   pointer-events: none;
+  transition: transform 0.45s cubic-bezier(0.16, 1, 0.3, 1),
+              opacity 0.45s cubic-bezier(0.16, 1, 0.3, 1),
+              filter 0.45s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 .photo {
@@ -73,9 +76,12 @@ body {
   border: 1px solid var(--border);
   cursor: grab;
   touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-user-drag: none;
   box-sizing: border-box;
   display: flex;
-  z-index: 2;
+  z-index: 50;
   transition: transform 0.15s ease, box-shadow 0.15s ease;
   pointer-events: auto;
   overflow: visible;
@@ -83,7 +89,14 @@ body {
   backdrop-filter: blur(16px);
   -webkit-backdrop-filter: blur(16px);
   padding: 0;
-  /* padding back to 0 since caption is removed */
+}
+
+.photo:active,
+.photo.dragging {
+  cursor: grabbing;
+  z-index: 80 !important;
+  transform: scale(1.02);
+  box-shadow: 0 12px 35px rgba(0, 0, 0, 0.35);
 }
 
 /* Snap alignment guide lines */
@@ -263,7 +276,16 @@ body {
   border: 1px solid transparent;
   color: var(--text-dim);
   cursor: pointer;
-  transition: background 0.2s ease, color 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
+  transition: transform 0.22s cubic-bezier(0.16, 1, 0.3, 1),
+              background 0.2s ease,
+              color 0.2s ease,
+              border-color 0.2s ease,
+              box-shadow 0.2s ease;
+  will-change: transform;
+}
+
+.task-btn:active {
+  transform: scale(0.9) !important;
 }
 
 .todo-badge {
@@ -293,7 +315,7 @@ body {
 
 
 .task-btn svg {
-  transition: transform 0.25s cubic-bezier(0.25, 1, 0.5, 1);
+  pointer-events: none;
 }
 
 .task-btn:hover,
@@ -301,12 +323,7 @@ body {
   background: var(--glass-strong);
   color: var(--text);
   border-color: var(--border);
-  box-shadow: 0 0 12px var(--theme-accent-glow);
-}
-
-.task-btn:hover svg,
-.task-btn.active svg {
-  transform: scale(1.1) rotate(15deg);
+  box-shadow: 0 0 14px var(--theme-accent-glow);
 }
 
 .task-btn-danger:hover {
@@ -333,7 +350,7 @@ body {
   -webkit-backdrop-filter: blur(24px);
   border-radius: var(--radius);
   padding: 18px;
-  z-index: 13;
+  z-index: 1100;
   display: flex;
   flex-direction: column;
   opacity: 0;
@@ -349,6 +366,26 @@ body {
   transform: translateY(-50%) translateX(0) scale(1);
   transition: opacity 0.35s cubic-bezier(0.34, 1.56, 0.64, 1),
               transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+/* Staggered entrance for items inside open drawers */
+.slide-drawer.open .bookmark-item,
+.slide-drawer.open .todo-item,
+.slide-drawer.open .control-group,
+.slide-drawer.open .bg-drop-zone {
+  animation: drawerItemEntrance 0.35s cubic-bezier(0.16, 1, 0.3, 1) both;
+  animation-delay: calc(var(--item-index, 0) * 35ms);
+}
+
+@keyframes drawerItemEntrance {
+  0% {
+    opacity: 0;
+    transform: translateY(10px) scale(0.96);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
 }
 
 .drawer-header {
@@ -542,11 +579,19 @@ body {
   margin-top: 8px;
 }
 
-body.focus-mode .vertical-toolbar,
+body.focus-mode .vertical-toolbar {
+  opacity: 0 !important;
+  pointer-events: none !important;
+  transform: translateY(-50%) translateX(-40px) scale(0.9) !important;
+  transition: opacity 0.45s cubic-bezier(0.16, 1, 0.3, 1),
+              transform 0.45s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
 body.focus-mode .board {
   opacity: 0 !important;
   pointer-events: none !important;
-  transition: opacity 0.5s ease;
+  transform: scale(0.94);
+  filter: blur(6px);
 }
 
 body.focus-mode .stage {
@@ -994,7 +1039,7 @@ body.focus-mode .stage {
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: all 0.2s ease;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
   flex-shrink: 0;
 }
 
@@ -1005,12 +1050,20 @@ body.focus-mode .stage {
   border-radius: 50%;
   background: var(--text);
   transform: scale(0);
-  transition: transform 0.18s cubic-bezier(0.34, 1.56, 0.64, 1);
+  transition: transform 0.22s cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 
 .todo-item.completed .todo-checkbox {
   background: var(--glass-strong);
   border-color: var(--text-dim);
+  animation: checkboxPop 0.32s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+@keyframes checkboxPop {
+  0% { transform: scale(1); }
+  45% { transform: scale(1.35); }
+  75% { transform: scale(0.9); }
+  100% { transform: scale(1); }
 }
 
 .todo-item.completed .todo-checkbox::after {
@@ -1027,17 +1080,33 @@ body.focus-mode .stage {
 }
 
 .todo-text {
+  position: relative;
   font-size: 13px;
   font-weight: 500;
   color: var(--text);
   word-break: break-word;
-  transition: color 0.15s, text-decoration 0.15s;
+  transition: color 0.25s cubic-bezier(0.16, 1, 0.3, 1);
   cursor: text;
+}
+
+.todo-text::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 50%;
+  width: 0%;
+  height: 1.5px;
+  background: var(--text-dim);
+  transition: width 0.28s cubic-bezier(0.16, 1, 0.3, 1);
+  pointer-events: none;
 }
 
 .todo-item.completed .todo-text {
   color: var(--text-dim);
-  text-decoration: line-through;
+}
+
+.todo-item.completed .todo-text::after {
+  width: 100%;
 }
 
 .todo-meta {
@@ -1382,9 +1451,93 @@ body.focus-mode .stage {
   font-family: inherit;
 }
 
-.focus-notification.visible {
-  opacity: 0.85;
-  transform: translateY(0);
+/* ---------- Top-Right Large Two-Line Stacked Clock Widget ---------- */
+.clock-widget {
+  position: fixed;
+  top: 28px;
+  right: 32px;
+  z-index: 100;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 4px;
+  padding: 0;
+  background: transparent !important;
+  border: none !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  box-shadow: none !important;
+  color: var(--text);
+  cursor: pointer;
+  user-select: none;
+  -webkit-user-select: none;
+  transition: opacity 0.3s ease, transform 0.2s ease;
+  pointer-events: auto;
+  text-align: right;
+}
+
+.clock-widget:hover {
+  background: transparent !important;
+  border-color: transparent !important;
+  transform: scale(1.02);
+}
+
+.clock-time {
+  font-family: 'Space Grotesk', sans-serif;
+  font-weight: 700;
+  font-size: 48px;
+  line-height: 1;
+  color: var(--text);
+  letter-spacing: -1px;
+}
+
+.clock-colon {
+  display: inline-block;
+  color: var(--text);
+  opacity: 1;
+  margin: 0 1px;
+}
+
+.clock-ampm {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--text);
+  opacity: 1;
+  margin-left: 4px;
+  text-transform: uppercase;
+}
+
+.clock-date {
+  font-size: 15px;
+  color: var(--text);
+  font-weight: 500;
+  opacity: 1;
+  letter-spacing: 0.5px;
+}
+
+/* Strict theme text color overrides */
+[data-theme="light"] .clock-widget,
+[data-theme="light"] .clock-time,
+[data-theme="light"] .clock-colon,
+[data-theme="light"] .clock-ampm,
+[data-theme="light"] .clock-date {
+  color: #000000 !important;
+}
+
+:root:not([data-theme="light"]) .clock-widget,
+:root:not([data-theme="light"]) .clock-time,
+:root:not([data-theme="light"]) .clock-colon,
+:root:not([data-theme="light"]) .clock-ampm,
+:root:not([data-theme="light"]) .clock-date {
+  color: #ffffff !important;
+}
+
+body.focus-mode .clock-widget {
+  opacity: 0 !important;
+  transform: translateY(-16px) scale(0.9) !important;
+  pointer-events: none !important;
+  transition: opacity 0.45s cubic-bezier(0.16, 1, 0.3, 1),
+              transform 0.45s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 /* ---------- Focus Mode Countdown Timer Layout ---------- */
@@ -1396,7 +1549,8 @@ body.focus-mode .stage {
   width: 100%;
   opacity: 1;
   transform: scale(1);
-  transition: opacity 0.4s cubic-bezier(0.4, 0, 0.2, 1), transform 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+  transition: opacity 0.45s cubic-bezier(0.16, 1, 0.3, 1),
+              transform 0.45s cubic-bezier(0.16, 1, 0.3, 1);
   pointer-events: auto;
   position: relative;
 }
@@ -1408,8 +1562,9 @@ body.focus-mode .stage {
   align-items: center;
   width: 100%;
   opacity: 0;
-  transform: scale(0.96);
-  transition: opacity 0.4s cubic-bezier(0.4, 0, 0.2, 1), transform 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+  transform: translateY(24px) scale(0.96);
+  transition: opacity 0.45s cubic-bezier(0.16, 1, 0.3, 1),
+              transform 0.45s cubic-bezier(0.16, 1, 0.3, 1);
   pointer-events: none;
   position: relative;
 }
@@ -1435,14 +1590,33 @@ body.focus-mode .stage {
 /* Toggle visibility in Focus Mode with smooth transitions */
 .focus-mode .clock-view {
   opacity: 0;
-  transform: scale(0.96);
+  transform: translateY(-16px) scale(0.96);
   pointer-events: none;
 }
 
 .focus-mode .timer-view {
   opacity: 1;
-  transform: scale(1);
+  transform: translateY(0) scale(1);
   pointer-events: auto;
+}
+
+.focus-mode .timer-presets {
+  animation: timerControlsSlideUp 0.45s cubic-bezier(0.16, 1, 0.3, 1) 0.08s both;
+}
+
+.focus-mode .timer-streak {
+  animation: timerControlsSlideUp 0.45s cubic-bezier(0.16, 1, 0.3, 1) 0.16s both;
+}
+
+@keyframes timerControlsSlideUp {
+  0% {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 .timer-display-container {
@@ -2009,8 +2183,8 @@ body.focus-mode .stage {
   width: 360px;
   display: flex;
   flex-direction: column;
-  z-index: 100;
-  pointer-events: auto;
+  z-index: 500;
+  pointer-events: none;
   transition: bottom 0.32s cubic-bezier(0.16, 1, 0.3, 1),
               width 0.32s cubic-bezier(0.16, 1, 0.3, 1),
               opacity var(--transition-speed) var(--transition-bezier);
@@ -2022,6 +2196,7 @@ body.focus-mode .stage {
 }
 
 .search-container {
+  pointer-events: auto;
   width: 100%;
   height: 38px;
   background: var(--glass);
@@ -2217,25 +2392,25 @@ body.focus-mode .search-wrapper {
 .search-overlay {
   position: fixed;
   inset: 0;
-  z-index: 99;
-  background: rgba(5, 5, 5, 0.4);
+  z-index: 400;
+  background: rgba(5, 5, 5, 0.45);
   backdrop-filter: blur(0px);
   -webkit-backdrop-filter: blur(0px);
   opacity: 0;
   pointer-events: none;
-  transition: opacity 0.4s cubic-bezier(0.25, 1, 0.5, 1),
-              backdrop-filter 0.4s cubic-bezier(0.25, 1, 0.5, 1),
-              -webkit-backdrop-filter 0.4s cubic-bezier(0.25, 1, 0.5, 1);
+  transition: opacity 0.35s cubic-bezier(0.16, 1, 0.3, 1),
+              backdrop-filter 0.35s cubic-bezier(0.16, 1, 0.3, 1),
+              -webkit-backdrop-filter 0.35s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 [data-theme="light"] .search-overlay {
-  background: rgba(255, 255, 255, 0.4);
+  background: rgba(255, 255, 255, 0.45);
 }
 
 body.search-focused .search-overlay {
   opacity: 1;
-  backdrop-filter: blur(24px) saturate(1.2);
-  -webkit-backdrop-filter: blur(24px) saturate(1.2);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
   pointer-events: auto;
 }
 

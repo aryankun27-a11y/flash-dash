@@ -77,7 +77,7 @@
   const steps = [
     {
       title: "Welcome to Flash Dash! ⚡",
-      text: "This is a visual guide book to show you around your new dashboard and where all your tools are located.",
+      text: "This interactive guide will walk you through your personalized dashboard, vision board, focus tools, and drawer utilities.",
       target: () => null,
       placement: "center",
       onBeforeShow: () => {
@@ -85,8 +85,8 @@
       }
     },
     {
-      title: "Left Toolbar",
-      text: "This main Toolbar houses all your widgets and settings. Access Bookmarks to search favorite links, manage Tasks, upload custom screen Backgrounds (dim/blur), or Toggle dark and light theme modes.",
+      title: "Main Control Toolbar 🛠️",
+      text: "The vertical toolbar grants quick access to all your tools: pin goal photos, adjust wallpapers, access bookmarks, manage tasks, lock the whiteboard, and toggle theme mode.",
       target: () => document.getElementById('verticalToolbar'),
       placement: "right",
       onBeforeShow: () => {
@@ -94,16 +94,78 @@
       }
     },
     {
-      title: "Clock & Date",
-      text: "At the center is the Minimal Clock and calendar. It displays the current local time and date in a clean font designed to stay out of the way of your vision board elements.",
-      target: () => document.getElementById('clockView'),
-      placement: "right"
+      title: "Lock Whiteboard 🔒",
+      text: "Click the Lock button to freeze all pinned goal photos on your vision board, preventing accidental dragging or resizing while keeping your layout pristine.",
+      target: () => document.getElementById('lockBoardBtn'),
+      placement: "right",
+      onBeforeShow: () => {
+        closeAllDrawers();
+      }
     },
     {
-      title: "Focus Mode Timer",
-      text: "Behind the clock is the Focus Timer. When active, it displays a countdown. You can configure duration presets here to start focused work sessions and build a daily focus streak.",
+      title: "Chrome Bookmarks Drawer 🔖",
+      text: "Click the Bookmarks icon to open your full Chrome bookmarks directory. Supports instant text search filtering for fast link navigation.",
       target: () => {
-        // Visually trigger Focus Mode preview
+        const d = document.getElementById('bookmarksDrawer');
+        if (d) d.classList.add('open');
+        return d;
+      },
+      placement: "right",
+      transitionDelay: 350,
+      onBeforeShow: () => {
+        closeAllDrawers();
+      },
+      onAfterHide: () => {
+        closeAllDrawers();
+      }
+    },
+    {
+      title: "Interactive Tasks Drawer ✅",
+      text: "Keep track of daily goals with priority tags (Low, Medium, High), animated checkmark completions, drag-and-drop task reordering, and live task counter badges.",
+      target: () => {
+        const d = document.getElementById('todoDrawer');
+        if (d) d.classList.add('open');
+        return d;
+      },
+      placement: "right",
+      transitionDelay: 350,
+      onBeforeShow: () => {
+        closeAllDrawers();
+      },
+      onAfterHide: () => {
+        closeAllDrawers();
+      }
+    },
+    {
+      title: "Background & Data Settings 🖼️",
+      text: "Drag & drop custom wallpapers or upload photos here. Fine-tune your screen's background dimness and blur levels, or clear whiteboard images at any time.",
+      target: () => {
+        const d = document.getElementById('bgSettingsDrawer');
+        if (d) d.classList.add('open');
+        return d;
+      },
+      placement: "right",
+      transitionDelay: 350,
+      onBeforeShow: () => {
+        closeAllDrawers();
+      },
+      onAfterHide: () => {
+        closeAllDrawers();
+      }
+    },
+    {
+      title: "Top-Right Clock & Date 🕐",
+      text: "The clean clock sits in the top-right corner, showing current time and date at a glance without cluttering your vision board workspace. Click to toggle 12h / 24h format.",
+      target: () => document.getElementById('clockView'),
+      placement: "left",
+      onBeforeShow: () => {
+        closeAllDrawers();
+      }
+    },
+    {
+      title: "Focus Mode Countdown Timer ⏳",
+      text: "Double-click anywhere to enter Focus Mode. Select duration presets (10m, 25m, 30m, 45m, 60m), track daily focus streaks, and use quick shortcuts ([Space], [R], [M]).",
+      target: () => {
         document.body.classList.add('focus-mode');
         const timerView = document.getElementById('timerView');
         if (timerView) {
@@ -111,15 +173,12 @@
           timerView.style.transform = 'scale(1)';
           timerView.style.pointerEvents = 'auto';
         }
-        const clockView = document.getElementById('clockView');
-        if (clockView) {
-          clockView.style.opacity = '0';
-          clockView.style.transform = 'scale(0.96)';
-          clockView.style.pointerEvents = 'none';
-        }
         return timerView;
       },
       placement: "right",
+      onBeforeShow: () => {
+        closeAllDrawers();
+      },
       onAfterHide: () => {
         document.body.classList.remove('focus-mode');
         const timerView = document.getElementById('timerView');
@@ -128,31 +187,16 @@
           timerView.style.transform = '';
           timerView.style.pointerEvents = '';
         }
-        const clockView = document.getElementById('clockView');
-        if (clockView) {
-          clockView.style.opacity = '';
-          clockView.style.transform = '';
-          clockView.style.pointerEvents = '';
-        }
       }
     },
     {
-      title: "Quick Shortcuts",
-      text: "Below the clock is the Pinned Shortcuts grid. This is where your favorite websites are located for fast navigation. You can add new links, rearrange their order, or remove them.",
-      target: () => document.getElementById('ghostGrid'),
-      placement: "right"
-    },
-    {
-      title: "Vision Board Canvas",
-      text: "The entire background acts as a freeform Vision Board. This is where your pinned goal photos and GIFs reside. You can add goals using this upload button, or simply drag and drop images directly onto the screen.",
-      target: () => document.getElementById('addPhotoBtn'),
-      placement: "right"
-    },
-    {
-      title: "Google Search Bar",
-      text: "At the bottom is the Search Bar. It allows you to search Google directly from the new tab, offering autocomplete query suggestions, matching bookmarks, and top sites lookup.",
+      title: "Google Search Bar 🔍",
+      text: "Search Google directly from the bottom search bar with real-time query suggestions, keyboard arrow navigation, and matching bookmarks lookup.",
       target: () => document.getElementById('searchWrapper'),
-      placement: "left"
+      placement: "left",
+      onBeforeShow: () => {
+        closeAllDrawers();
+      }
     }
   ];
 
@@ -192,6 +236,8 @@
     if (step && typeof step.onAfterHide === 'function') {
       step.onAfterHide();
     }
+
+    closeAllDrawers();
 
     // Hide overlay
     overlay.classList.remove('visible');
@@ -292,8 +338,8 @@
           activeTarget.style.position = 'relative';
         }
         
-        // Bring targeted component to front above frosted mask overlay
-        activeTarget.style.zIndex = '110060';
+        // Bring targeted component to front above frosted mask overlay (11000) but below tooltip card (11050)
+        activeTarget.style.zIndex = '11010';
         activeTarget.style.pointerEvents = 'none'; // non-interactive during tour
         activeTarget.classList.add('tutorial-highlight-target');
 
