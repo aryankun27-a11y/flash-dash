@@ -19,7 +19,17 @@ const store = {
   async get(key, fallback) {
     if (chromeStore) {
       return new Promise(res => {
-        chromeStore.get([key], r => res(r[key] !== undefined ? r[key] : fallback));
+        try {
+          chromeStore.get([key], r => {
+            if (chrome.runtime && chrome.runtime.lastError) {
+              res(fallback);
+            } else {
+              res((r && r[key] !== undefined) ? r[key] : fallback);
+            }
+          });
+        } catch (e) {
+          res(fallback);
+        }
       });
     }
     try {
@@ -30,12 +40,9 @@ const store = {
   async set(key, value) {
     if (chromeStore) {
       return new Promise(res => {
-        chromeStore.set({ [key]: value }, () => {
-          if (chrome.runtime.lastError) {
-            console.error(`Flash Dash Storage Error: Failed to set key "${key}":`, chrome.runtime.lastError);
-          }
-          res();
-        });
+        try {
+          chromeStore.set({ [key]: value }, () => res());
+        } catch (e) { res(); }
       });
     }
     try {
@@ -47,12 +54,9 @@ const store = {
   async setMultiple(obj) {
     if (chromeStore) {
       return new Promise(res => {
-        chromeStore.set(obj, () => {
-          if (chrome.runtime.lastError) {
-            console.error('Flash Dash Storage Error: Failed to set multiple keys:', chrome.runtime.lastError, obj);
-          }
-          res();
-        });
+        try {
+          chromeStore.set(obj, () => res());
+        } catch (e) { res(); }
       });
     }
     try {
@@ -271,32 +275,32 @@ const ModalManager = {
     return new Promise((resolve) => {
       this.currentResolve = resolve;
       this.content.innerHTML = `
-        <h2 class="modal-welcome-title">⚡ Welcome to Flash Dash!</h2>
+        <h2 class="modal-welcome-title">Welcome to Flash Dash</h2>
         <p class="modal-welcome-desc">A premium, distraction-free dashboard. Here are the core features:</p>
         <ul class="modal-welcome-list">
           <li class="modal-welcome-item">
-            <span class="modal-welcome-icon">🕐</span>
+            <span class="modal-welcome-icon"></span>
             <div class="modal-welcome-text">
               <strong>Focus Countdown</strong>
               <span>Double-click the background or clock to enter Focus Mode. Select duration presets (10m, 25m, 30m, 45m, 60m) with micro-tick animations.</span>
             </div>
           </li>
           <li class="modal-welcome-item">
-            <span class="modal-welcome-icon">✅</span>
+            <span class="modal-welcome-icon"></span>
             <div class="modal-welcome-text">
               <strong>Interactive Task List</strong>
               <span>Manage your daily schedule on the right-side task card. Drag-and-drop to reorder tasks easily, and double-click to edit inline.</span>
             </div>
           </li>
           <li class="modal-welcome-item">
-            <span class="modal-welcome-icon">🔖</span>
+            <span class="modal-welcome-icon"></span>
             <div class="modal-welcome-text">
               <strong>Chrome Bookmarks Drawer</strong>
               <span>Access all Chrome bookmarks in the slide drawer, complete with real-time text search filtering.</span>
             </div>
           </li>
           <li class="modal-welcome-item">
-            <span class="modal-welcome-icon">🖼️</span>
+            <span class="modal-welcome-icon"></span>
             <div class="modal-welcome-text">
               <strong>Snapping Goal Whiteboard</strong>
               <span>Drag &amp; drop images directly. Resizing and dragging snaps borders.</span>
@@ -350,6 +354,9 @@ async function toggleFocusMode(e) {
       e.target.closest('.vertical-toolbar') ||
       e.target.closest('.slide-drawer') ||
       e.target.closest('#bgSettingsDrawer') ||
+      e.target.closest('.top-right-dock') ||
+      e.target.closest('#clockTodoWidget') ||
+      e.target.closest('.search-wrapper') ||
       e.target.closest('#timerTime')) return;
   }
 
@@ -432,7 +439,7 @@ function showDesktopNotification() {
   if (window.Notification && Notification.permission === 'granted') {
     try {
       new Notification("Flash Dash", {
-        body: "Time is up! Great focus session. ⚡",
+        body: "Time is up! Great focus session.",
         icon: "icons/icon128.png"
       });
     } catch (e) {
@@ -862,6 +869,214 @@ let loadedPhotos = [];
 const photoObjectUrls = new Map();
 let _focusedPhotoEl = null; // Tracks the last clicked photo for keyboard delete
 
+// Infinite Canvas Transform State
+let canvasPanX = 0;
+let canvasPanY = 0;
+let canvasScale = 1.0;
+let isSpacePressed = false;
+let isPanning = false;
+let panStartX = 0;
+let panStartY = 0;
+let saveCanvasTimeout = null;
+
+// Smooth RAF State
+let rafId = null;
+
+function applyCanvasTransform(animate = false) {
+  const target = document.getElementById('boardCanvas') || board;
+  if (!target) return;
+
+  canvasScale = 1.0;
+
+  if (animate) {
+    target.style.transition = 'transform 0.3s cubic-bezier(0.16, 1, 0.3, 1)';
+    setTimeout(() => {
+      target.style.transition = '';
+    }, 300);
+  } else {
+    target.style.transition = '';
+  }
+
+  // Force GPU hardware-accelerated 3D transform for 60fps/120fps smooth panning
+  const transformStr = `translate3d(${canvasPanX}px, ${canvasPanY}px, 0px)`;
+  target.style.transform = transformStr;
+}
+
+function requestSmoothTransform() {
+  if (rafId) return;
+  rafId = requestAnimationFrame(() => {
+    rafId = null;
+    applyCanvasTransform(false);
+  });
+}
+
+function debouncedSaveCanvasTransform() {
+  if (saveCanvasTimeout) clearTimeout(saveCanvasTimeout);
+  saveCanvasTimeout = setTimeout(saveCanvasTransform, 300);
+}
+
+async function saveCanvasTransform() {
+  await store.setMultiple({
+    boardPanX: canvasPanX,
+    boardPanY: canvasPanY,
+    boardZoomScale: 1.0
+  });
+}
+
+async function initCanvasTransform() {
+  canvasPanX = await store.get('boardPanX', 0);
+  canvasPanY = await store.get('boardPanY', 0);
+  canvasScale = 1.0;
+  applyCanvasTransform(false);
+}
+
+function recenterCanvas() {
+  canvasPanX = 0;
+  canvasPanY = 0;
+  canvasScale = 1.0;
+  applyCanvasTransform(true);
+  saveCanvasTransform();
+  if (typeof showFocusNotification === 'function') {
+    showFocusNotification("Canvas Reset to Center");
+  }
+}
+
+const recenterBoardBtn = document.getElementById('recenterBoardBtn');
+if (recenterBoardBtn) {
+  recenterBoardBtn.addEventListener('click', recenterCanvas);
+}
+
+// Track spacebar for canvas panning
+window.addEventListener('keydown', (e) => {
+  const activeEl = document.activeElement;
+  if (activeEl && (activeEl.tagName === 'INPUT' || activeEl.tagName === 'TEXTAREA' || activeEl.isContentEditable)) return;
+
+  if (e.code === 'Space' && !e.repeat) {
+    const modalOverlay = document.getElementById('customModalOverlay');
+    if (modalOverlay && modalOverlay.classList.contains('active')) return;
+    const tutorialOverlay = document.getElementById('tutorialOverlay');
+    if (tutorialOverlay && tutorialOverlay.classList.contains('visible')) return;
+
+    isSpacePressed = true;
+    document.body.classList.add('space-panning');
+  }
+});
+
+window.addEventListener('keyup', (e) => {
+  if (e.code === 'Space') {
+    isSpacePressed = false;
+    document.body.classList.remove('space-panning');
+    document.body.classList.remove('space-panning-active');
+  }
+});
+
+// Canvas Panning Pointer Handlers (Direct 1:1 360° Freeform Panning)
+window.addEventListener('pointerdown', (e) => {
+  const isMiddleClick = e.button === 1;
+  const isLeftClick = e.button === 0;
+  const isBackgroundClick = isLeftClick &&
+    !e.target.closest('.photo') &&
+    !e.target.closest('.vertical-toolbar') &&
+    !e.target.closest('.slide-drawer') &&
+    !e.target.closest('.custom-modal-card') &&
+    !e.target.closest('.creator-note-overlay') &&
+    !e.target.closest('.tutorial-tour-container');
+
+  if (isBackgroundClick) {
+    clearPhotoSelection();
+  }
+
+  if (isMiddleClick || isSpacePressed || isBackgroundClick) {
+    if (e.target.closest('.del')) return;
+    isPanning = true;
+    panStartX = e.clientX - canvasPanX;
+    panStartY = e.clientY - canvasPanY;
+
+    document.body.classList.add('space-panning');
+    document.body.classList.add('space-panning-active');
+
+    try {
+      if (e.target && e.target.setPointerCapture) {
+        e.target.setPointerCapture(e.pointerId);
+      }
+    } catch (err) { }
+  }
+});
+
+window.addEventListener('pointermove', (e) => {
+  if (!isPanning) return;
+  canvasPanX = e.clientX - panStartX;
+  canvasPanY = e.clientY - panStartY;
+  requestSmoothTransform();
+});
+
+function stopCanvasPanning(e) {
+  if (isPanning) {
+    isPanning = false;
+    document.body.classList.remove('space-panning');
+    document.body.classList.remove('space-panning-active');
+    try {
+      if (e && e.target && e.target.releasePointerCapture) {
+        e.target.releasePointerCapture(e.pointerId);
+      }
+    } catch (err) { }
+    saveCanvasTransform();
+  }
+}
+
+window.addEventListener('pointerup', stopCanvasPanning);
+window.addEventListener('pointercancel', stopCanvasPanning);
+
+// Prevent browser gesture zoom (Safari / Chrome trackpad gestures)
+window.addEventListener('gesturestart', (e) => e.preventDefault());
+window.addEventListener('gesturechange', (e) => e.preventDefault());
+window.addEventListener('gestureend', (e) => e.preventDefault());
+
+// Smooth 2D Canvas Panning on Mouse Wheel & Trackpad (360° Freeform Panning)
+window.addEventListener('wheel', (e) => {
+  if (e.target.closest('.slide-drawer') ||
+    e.target.closest('.todo-list') ||
+    e.target.closest('.bookmarks-list') ||
+    e.target.closest('.creator-note-card') ||
+    e.target.closest('.custom-modal-card')) {
+    return;
+  }
+
+  const modalOverlay = document.getElementById('customModalOverlay');
+  if (modalOverlay && modalOverlay.classList.contains('active')) return;
+  const tutorialOverlay = document.getElementById('tutorialOverlay');
+  if (tutorialOverlay && tutorialOverlay.classList.contains('visible')) return;
+
+  e.preventDefault();
+
+  // Pan canvas 360°
+  canvasPanX -= e.deltaX;
+  canvasPanY -= e.deltaY;
+  requestSmoothTransform();
+  debouncedSaveCanvasTransform();
+}, { passive: false });
+
+function clearPhotoSelection() {
+  const canvasTarget = document.getElementById('boardCanvas') || board;
+  if (canvasTarget) {
+    canvasTarget.querySelectorAll('.photo.selected').forEach(p => p.classList.remove('selected'));
+  }
+  _focusedPhotoEl = null;
+}
+
+function bringPhotoToFront(wrap, photo, persist) {
+  if (board.classList.contains('board-locked')) return;
+  clearPhotoSelection();
+  _photoZCounter += 1;
+  photo.z = _photoZCounter;
+  wrap.style.zIndex = _photoZCounter;
+  wrap.classList.add('selected');
+  _focusedPhotoEl = wrap;
+  if (typeof persist === 'function') {
+    persist();
+  }
+}
+
 async function updateClearPhotosBtnState() {
   if (!clearPhotosBtn) return;
   const photos = await store.get('photos', []);
@@ -872,15 +1087,28 @@ async function updateClearPhotosBtnState() {
   }
 }
 
+function getPhotoWorldCoords(photo) {
+  if (photo.x !== undefined && photo.y !== undefined) {
+    return { x: photo.x, y: photo.y };
+  }
+  const x = Math.round((photo.xPercent || 0.2) * window.innerWidth);
+  const y = Math.round((photo.yPercent || 0.2) * window.innerHeight);
+  photo.x = x;
+  photo.y = y;
+  return { x, y };
+}
+
 function updatePhotoPositionStyle(el, photo) {
-  el.style.left = (photo.xPercent * window.innerWidth) + 'px';
-  el.style.top = (photo.yPercent * window.innerHeight) + 'px';
+  const { x, y } = getPhotoWorldCoords(photo);
+  el.style.left = x + 'px';
+  el.style.top = y + 'px';
   el.style.width = (photo.w || 150) + 'px';
   el.style.height = (photo.h || 150) + 'px';
 }
 
 function updateAllPhotoStyles() {
-  const photoEls = board.querySelectorAll('.photo');
+  const canvasTarget = document.getElementById('boardCanvas') || board;
+  const photoEls = canvasTarget.querySelectorAll('.photo');
   photoEls.forEach(el => {
     const id = el.dataset.id;
     const photo = loadedPhotos.find(p => p.id === id);
@@ -912,10 +1140,14 @@ const SNAP_GAP = 0;
 
 function getOtherPhotoRects(excludeId) {
   const rects = [];
-  board.querySelectorAll('.photo').forEach(el => {
+  const canvasTarget = document.getElementById('boardCanvas') || board;
+  canvasTarget.querySelectorAll('.photo').forEach(el => {
     if (el.dataset.id === excludeId) return;
-    const r = el.getBoundingClientRect();
-    rects.push({ left: r.left, top: r.top, right: r.right, bottom: r.bottom, width: r.width, height: r.height });
+    const left = parseFloat(el.style.left) || el.offsetLeft;
+    const top = parseFloat(el.style.top) || el.offsetTop;
+    const width = parseFloat(el.style.width) || el.offsetWidth;
+    const height = parseFloat(el.style.height) || el.offsetHeight;
+    rects.push({ left, top, right: left + width, bottom: top + height, width, height });
   });
   return rects;
 }
@@ -926,14 +1158,16 @@ function showSnapGuides(xLines, yLines) {
   xLines.forEach(x => {
     const g = document.createElement('div');
     g.className = 'snap-guide snap-guide-x';
-    g.style.left = x + 'px';
+    const screenX = x + canvasPanX;
+    g.style.left = screenX + 'px';
     document.body.appendChild(g);
     _snapGuideEls.push(g);
   });
   yLines.forEach(y => {
     const g = document.createElement('div');
     g.className = 'snap-guide snap-guide-y';
-    g.style.top = y + 'px';
+    const screenY = y + canvasPanY;
+    g.style.top = screenY + 'px';
     document.body.appendChild(g);
     _snapGuideEls.push(g);
   });
@@ -993,21 +1227,21 @@ function makeResizableAndDraggable(el, photo, onChange) {
   el.addEventListener('pointerdown', (e) => {
     if (board.classList.contains('board-locked')) return;
     if (e.target.closest('.del')) return;
+    bringPhotoToFront(el, photo, onChange);
     e.preventDefault();
 
     const dir = getResizeDirection(el, e.clientX, e.clientY);
     const startX = e.clientX, startY = e.clientY;
     const origW = photo.w || 150;
     const origH = photo.h || 150;
-    const origX = photo.xPercent * window.innerWidth;
-    const origY = photo.yPercent * window.innerHeight;
+    const { x: origX, y: origY } = getPhotoWorldCoords(photo);
 
     el.setPointerCapture(e.pointerId);
 
     if (dir) {
       function moveResize(ev) {
-        const dx = ev.clientX - startX;
-        const dy = ev.clientY - startY;
+        const dx = (ev.clientX - startX) / canvasScale;
+        const dy = (ev.clientY - startY) / canvasScale;
 
         let newW = origW, newH = origH, newX = origX, newY = origY;
 
@@ -1034,6 +1268,7 @@ function makeResizableAndDraggable(el, photo, onChange) {
         newH = Math.max(50, newH);
 
         photo.w = newW; photo.h = newH;
+        photo.x = newX; photo.y = newY;
         photo.xPercent = newX / window.innerWidth;
         photo.yPercent = newY / window.innerHeight;
 
@@ -1048,7 +1283,7 @@ function makeResizableAndDraggable(el, photo, onChange) {
       function upResize() {
         try {
           el.releasePointerCapture(e.pointerId);
-        } catch (err) {}
+        } catch (err) { }
         el.removeEventListener('pointermove', moveResize);
         el.removeEventListener('pointerup', upResize);
         clearSnapGuides();
@@ -1063,15 +1298,11 @@ function makeResizableAndDraggable(el, photo, onChange) {
       el.classList.add('dragging');
 
       function moveDrag(ev) {
-        const dx = ev.clientX - startX;
-        const dy = ev.clientY - startY;
+        const dx = (ev.clientX - startX) / canvasScale;
+        const dy = (ev.clientY - startY) / canvasScale;
 
         let x = origX + dx;
         let y = origY + dy;
-
-        const margin = 20;
-        x = Math.max(margin, Math.min(window.innerWidth - (photo.w || 150) - margin, x));
-        y = Math.max(margin, Math.min(window.innerHeight - (photo.h || 150) - margin, y));
 
         const w = photo.w || 150, h = photo.h || 150;
         const tempRect = { left: x, top: y, right: x + w, bottom: y + h };
@@ -1079,6 +1310,8 @@ function makeResizableAndDraggable(el, photo, onChange) {
         x += snap.snapX;
         y += snap.snapY;
 
+        photo.x = x;
+        photo.y = y;
         photo.xPercent = x / window.innerWidth;
         photo.yPercent = y / window.innerHeight;
 
@@ -1091,7 +1324,7 @@ function makeResizableAndDraggable(el, photo, onChange) {
       function upDrag() {
         try {
           el.releasePointerCapture(e.pointerId);
-        } catch (err) {}
+        } catch (err) { }
         el.removeEventListener('pointermove', moveDrag);
         el.removeEventListener('pointerup', upDrag);
         el.style.cursor = 'grab';
@@ -1123,13 +1356,19 @@ async function renderPhotoEl(photo) {
   if (photo.src && photo.src.startsWith('data:')) {
     srcUrl = photo.src;
   } else {
-    const blob = await largeStore.get('photo_img_' + photo.id);
-    if (blob) {
-      if (photoObjectUrls.has(photo.id)) {
-        URL.revokeObjectURL(photoObjectUrls.get(photo.id));
+    try {
+      const blob = await largeStore.get('photo_img_' + photo.id);
+      if (blob) {
+        if (photoObjectUrls.has(photo.id)) {
+          URL.revokeObjectURL(photoObjectUrls.get(photo.id));
+        }
+        srcUrl = URL.createObjectURL(blob);
+        photoObjectUrls.set(photo.id, srcUrl);
+      } else if (photo.src) {
+        srcUrl = photo.src;
       }
-      srcUrl = URL.createObjectURL(blob);
-      photoObjectUrls.set(photo.id, srcUrl);
+    } catch (err) {
+      if (photo.src) srcUrl = photo.src;
     }
   }
   img.src = srcUrl;
@@ -1161,31 +1400,28 @@ async function renderPhotoEl(photo) {
       const idx = photos.findIndex(p => p.id === photo.id);
       if (idx > -1) {
         photos[idx] = {
+          ...photos[idx],
           id: photo.id,
-          xPercent: photo.xPercent,
-          yPercent: photo.yPercent,
+          x: photo.x,
+          y: photo.y,
+          xPercent: photo.x / window.innerWidth,
+          yPercent: photo.y / window.innerHeight,
           w: photo.w || 150,
           h: photo.h || 150,
           z: photo.z,
-          caption: photo.caption || ""
+          caption: photo.caption || "",
+          src: photos[idx].src || photo.src || ""
         };
       }
       return photos;
     });
   }
 
-  board.appendChild(wrap);
+  const canvasTarget = document.getElementById('boardCanvas') || board;
+  canvasTarget.appendChild(wrap);
 
   wrap.addEventListener('pointerdown', () => {
-    if (board.classList.contains('board-locked')) return;
-    _photoZCounter += 1;
-    photo.z = _photoZCounter;
-    wrap.style.zIndex = _photoZCounter;
-    wrap.classList.add('photo-lifted');
-    setTimeout(() => wrap.classList.remove('photo-lifted'), 350);
-    // Track this photo as the focused one for keyboard delete
-    _focusedPhotoEl = wrap;
-    persist();
+    bringPhotoToFront(wrap, photo, persist);
   });
 
   // Also set focused on mouseenter so hovering and pressing Delete works
@@ -1200,8 +1436,9 @@ async function renderBoard() {
   loadedPhotos = await store.get('photos', []);
   updateClearPhotosBtnState();
 
+  const canvasTarget = document.getElementById('boardCanvas') || board;
   const existingEls = new Map();
-  board.querySelectorAll('.photo').forEach(el => {
+  canvasTarget.querySelectorAll('.photo').forEach(el => {
     existingEls.set(el.dataset.id, el);
   });
 
@@ -1228,33 +1465,35 @@ async function renderBoard() {
   });
 }
 
-addPhotoBtn.addEventListener('click', () => {
-  const bookmarksDrawer = document.getElementById('bookmarksDrawer');
-  const bgSettingsDrawer = document.getElementById('bgSettingsDrawer');
-  const todoDrawer = document.getElementById('todoDrawer');
-  if (bookmarksDrawer) bookmarksDrawer.classList.remove('open');
-  if (bgSettingsDrawer) bgSettingsDrawer.classList.remove('open');
-  if (todoDrawer) todoDrawer.classList.remove('open');
-  photoInput.click();
-});
+if (addPhotoBtn && photoInput) {
+  addPhotoBtn.addEventListener('click', () => {
+    const bookmarksDrawer = document.getElementById('bookmarksDrawer');
+    const todoDrawer = document.getElementById('todoDrawer');
+    if (bookmarksDrawer) bookmarksDrawer.classList.remove('open');
+    if (todoDrawer) todoDrawer.classList.remove('open');
+    photoInput.click();
+  });
+}
 
-clearPhotosBtn.addEventListener('click', async () => {
-  const photos = await store.get('photos', []);
-  if (photos.length === 0) return;
+if (clearPhotosBtn) {
+  clearPhotosBtn.addEventListener('click', async () => {
+    const photos = await store.get('photos', []);
+    if (photos.length === 0) return;
 
-  const confirmed = await ModalManager.confirm(`Remove all ${photos.length} photo${photos.length === 1 ? '' : 's'} from the board?`);
-  if (!confirmed) return;
+    const confirmed = await ModalManager.confirm(`Remove all ${photos.length} photo${photos.length === 1 ? '' : 's'} from the board?`);
+    if (!confirmed) return;
 
-  photoObjectUrls.forEach(url => URL.revokeObjectURL(url));
-  photoObjectUrls.clear();
+    photoObjectUrls.forEach(url => URL.revokeObjectURL(url));
+    photoObjectUrls.clear();
 
-  for (const photo of photos) {
-    await largeStore.delete('photo_img_' + photo.id);
-  }
+    for (const photo of photos) {
+      await largeStore.delete('photo_img_' + photo.id);
+    }
 
-  await store.set('photos', []);
-  renderBoard();
-});
+    await store.set('photos', []);
+    renderBoard();
+  });
+}
 
 function downscaleAndGetSize(file, maxSide = 1200) {
   return new Promise((resolve) => {
@@ -1308,7 +1547,7 @@ function downscaleAndGetSize(file, maxSide = 1200) {
 
 function computeAutoGridPosition(existingPhotos, w, h, dropCoords) {
   if (dropCoords) {
-    return { x: dropCoords.x - w / 2, y: dropCoords.y - h / 2 };
+    return { x: dropCoords.x, y: dropCoords.y };
   }
 
   const GRID_GAP = 16;
@@ -1321,20 +1560,18 @@ function computeAutoGridPosition(existingPhotos, w, h, dropCoords) {
   }
 
   const last = existingPhotos[existingPhotos.length - 1];
-  const lastX = (last.xPercent || 0) * window.innerWidth;
-  const lastY = (last.yPercent || 0) * window.innerHeight;
+  const { x: lastX, y: lastY } = getPhotoWorldCoords(last);
   const lastW = last.w || 150;
   const lastH = last.h || 150;
 
   let nextX = lastX + lastW + GRID_GAP;
   let nextY = lastY;
 
-  if (nextX + w > MAX_X) {
+  if (nextX + w > lastX + 600) {
     nextX = START_X;
     let rowMaxBottom = lastY + lastH;
     for (const p of existingPhotos) {
-      const pX = (p.xPercent || 0) * window.innerWidth;
-      const pY = (p.yPercent || 0) * window.innerHeight;
+      const { x: pX, y: pY } = getPhotoWorldCoords(p);
       const pH = p.h || 150;
       if (Math.abs(pY - lastY) < 10) {
         rowMaxBottom = Math.max(rowMaxBottom, pY + pH);
@@ -1366,29 +1603,47 @@ async function addPhotos(files, dropCoords = null) {
       w = Math.round(MAX_SIDE * (natW / natH));
     }
 
-    const coords = dropCoords
-      ? { x: dropCoords.x - w / 2 + (i * 15), y: dropCoords.y - h / 2 + (i * 15) }
-      : null;
+    let worldX = 0, worldY = 0;
 
-    const { x, y } = computeAutoGridPosition(existingSnapshot, w, h, coords);
-
-    const margin = 20;
-    const clampedX = Math.max(margin, Math.min(window.innerWidth - w - margin, x));
-    const clampedY = Math.max(margin, Math.min(window.innerHeight - h - margin, y));
+    if (dropCoords && dropCoords.isWorld) {
+      worldX = dropCoords.x + (i * 15);
+      worldY = dropCoords.y + (i * 15);
+    } else if (dropCoords) {
+      worldX = (dropCoords.x - canvasPanX) / canvasScale - w / 2 + (i * 15);
+      worldY = (dropCoords.y - canvasPanY) / canvasScale - h / 2 + (i * 15);
+    } else {
+      const screenCenterX = window.innerWidth / 2;
+      const screenCenterY = window.innerHeight / 2;
+      const fallbackX = (screenCenterX - canvasPanX) / canvasScale - w / 2 + (i * 15);
+      const fallbackY = (screenCenterY - canvasPanY) / canvasScale - h / 2 + (i * 15);
+      const gridPos = computeAutoGridPosition(existingSnapshot, w, h, null);
+      worldX = gridPos.x + (i * 15);
+      worldY = gridPos.y + (i * 15);
+    }
 
     _photoZCounter += 1;
     const photoId = Date.now() + Math.random().toString(36).slice(2);
 
     await largeStore.set('photo_img_' + photoId, blob);
 
+    const dataUrl = await new Promise(res => {
+      const reader = new FileReader();
+      reader.onload = e => res(e.target.result);
+      reader.onerror = () => res('');
+      reader.readAsDataURL(blob);
+    });
+
     const photo = {
       id: photoId,
-      xPercent: clampedX / window.innerWidth,
-      yPercent: clampedY / window.innerHeight,
+      x: worldX,
+      y: worldY,
+      xPercent: worldX / window.innerWidth,
+      yPercent: worldY / window.innerHeight,
       w: w,
       h: h,
       z: _photoZCounter,
-      caption: ""
+      caption: "",
+      src: dataUrl
     };
     photos.push(photo);
     existingSnapshot.push(photo);
@@ -1446,9 +1701,26 @@ document.addEventListener('drop', async (e) => {
 window.renderBoard = renderBoard;
 window.addPhotos = addPhotos;
 
-// Keyboard Delete/Backspace to remove the focused/hovered photo
+let _copiedPhoto = null; // Internal store for copied photo object and blob
+
+// Helper to get targeted photo element (selected, hovered, or single photo)
+function getTargetPhotoElement() {
+  if (_focusedPhotoEl && document.body.contains(_focusedPhotoEl)) {
+    return _focusedPhotoEl;
+  }
+  const canvasTarget = document.getElementById('boardCanvas') || board;
+  if (!canvasTarget) return null;
+  const selected = canvasTarget.querySelector('.photo.selected');
+  if (selected) return selected;
+  const allPhotos = canvasTarget.querySelectorAll('.photo');
+  if (allPhotos.length === 1) return allPhotos[0];
+  return null;
+}
+
+// Keyboard shortcuts for Whiteboard: Ctrl+C (Copy), Ctrl+V (Paste), Delete, Backspace
 document.addEventListener('keydown', async (e) => {
-  if (e.key !== 'Delete' && e.key !== 'Backspace') return;
+  const isCmdOrCtrl = e.ctrlKey || e.metaKey;
+  const key = e.key.toLowerCase();
 
   // Don't fire if typing in an input, textarea, or editable element
   const activeEl = document.activeElement;
@@ -1463,14 +1735,170 @@ document.addEventListener('keydown', async (e) => {
   // Don't fire if board is locked
   if (board && board.classList.contains('board-locked')) return;
 
-  if (!_focusedPhotoEl || !document.body.contains(_focusedPhotoEl)) return;
+  // Handle Ctrl+C / Cmd+C (Copy Photo)
+  if (isCmdOrCtrl && key === 'c') {
+    const targetEl = getTargetPhotoElement();
+    if (!targetEl) return;
+    const photoId = targetEl.dataset.id;
+    const photo = loadedPhotos.find(p => p.id === photoId);
+    if (!photo) return;
 
-  // Find the photo id and trigger its delete button
-  const delBtn = _focusedPhotoEl.querySelector('.del');
-  if (delBtn) {
     e.preventDefault();
-    delBtn.click();
-    _focusedPhotoEl = null;
+
+    let blob = await largeStore.get('photo_img_' + photoId);
+    if (!blob && photo.src) {
+      blob = dataURLtoBlob(photo.src);
+    }
+
+    _copiedPhoto = {
+      photo: { ...photo },
+      blob: blob
+    };
+
+    // Write to browser system clipboard
+    if (blob && navigator.clipboard && window.ClipboardItem) {
+      try {
+        const mimeType = blob.type || 'image/png';
+        const item = new ClipboardItem({ [mimeType]: blob });
+        await navigator.clipboard.write([item]);
+      } catch (err) {
+        // Ignored if permissions restrict clipboard write
+      }
+    }
+
+    // Visual feedback
+    targetEl.classList.remove('photo-lifted');
+    void targetEl.offsetWidth; // trigger reflow
+    targetEl.classList.add('photo-lifted');
+    if (typeof showFocusNotification === 'function') {
+      showFocusNotification("Photo Copied to Clipboard");
+    }
+    return;
+  }
+
+  // Handle Ctrl+V / Cmd+V (Paste Photo/Image via Keydown)
+  if (isCmdOrCtrl && key === 'v') {
+    let pastedSystemImage = false;
+
+    // Try reading system clipboard directly if available
+    if (navigator.clipboard && navigator.clipboard.read) {
+      try {
+        const items = await navigator.clipboard.read();
+        const files = [];
+        for (const item of items) {
+          for (const type of item.types) {
+            if (type.startsWith('image/')) {
+              const b = await item.getType(type);
+              if (b) files.push(b);
+            }
+          }
+        }
+        if (files.length > 0) {
+          e.preventDefault();
+          pastedSystemImage = true;
+          await addPhotos(files);
+          if (typeof showFocusNotification === 'function') {
+            showFocusNotification("Pasted Image from Clipboard");
+          }
+          return;
+        }
+      } catch (err) {
+        // Ignored if clipboard read permission not granted
+      }
+    }
+
+    // Fallback to internal _copiedPhoto
+    if (!pastedSystemImage && _copiedPhoto && _copiedPhoto.blob) {
+      e.preventDefault();
+
+      const prevX = _copiedPhoto.photo.x !== undefined ? _copiedPhoto.photo.x : 100;
+      const prevY = _copiedPhoto.photo.y !== undefined ? _copiedPhoto.photo.y : 100;
+      const newX = prevX + 30;
+      const newY = prevY + 30;
+
+      _copiedPhoto.photo.x = newX;
+      _copiedPhoto.photo.y = newY;
+
+      const dropCoords = { x: newX, y: newY, isWorld: true };
+      await addPhotos([_copiedPhoto.blob], dropCoords);
+
+      if (typeof showFocusNotification === 'function') {
+        showFocusNotification("Pasted Photo onto Whiteboard");
+      }
+    }
+    return;
+  }
+
+  // Handle Delete / Backspace (Delete Photo)
+  if (key === 'delete' || key === 'backspace') {
+    const targetEl = getTargetPhotoElement();
+    if (!targetEl) return;
+    const delBtn = targetEl.querySelector('.del');
+    if (delBtn) {
+      e.preventDefault();
+      delBtn.click();
+      _focusedPhotoEl = null;
+    }
+    return;
+  }
+});
+
+// Clipboard Paste Event Handler for Whiteboard Images (Ctrl+V / Cmd+V or context menu paste)
+document.addEventListener('paste', async (e) => {
+  // Don't fire if typing in an input, textarea, or editable element
+  const activeEl = document.activeElement;
+  if (activeEl && (activeEl.tagName === 'INPUT' || activeEl.tagName === 'TEXTAREA' || activeEl.isContentEditable)) return;
+
+  // Don't fire if a modal or tutorial is open
+  const modalOverlay = document.getElementById('customModalOverlay');
+  if (modalOverlay && modalOverlay.classList.contains('active')) return;
+  const tutorialOverlay = document.getElementById('tutorialOverlay');
+  if (tutorialOverlay && tutorialOverlay.classList.contains('visible')) return;
+
+  // Don't fire if board is locked
+  if (board && board.classList.contains('board-locked')) return;
+
+  // 1. Check system clipboard items for image files
+  const clipboardItems = e.clipboardData ? e.clipboardData.items : [];
+  const imageFiles = [];
+
+  if (clipboardItems && clipboardItems.length > 0) {
+    for (let i = 0; i < clipboardItems.length; i++) {
+      const item = clipboardItems[i];
+      if (item.type && item.type.startsWith('image/')) {
+        const file = item.getAsFile();
+        if (file) imageFiles.push(file);
+      }
+    }
+  }
+
+  if (imageFiles.length > 0) {
+    e.preventDefault();
+    await addPhotos(imageFiles);
+    if (typeof showFocusNotification === 'function') {
+      showFocusNotification("Pasted Image onto Whiteboard");
+    }
+    return;
+  }
+
+  // 2. Fallback to internal copied photo
+  if (_copiedPhoto && _copiedPhoto.blob) {
+    e.preventDefault();
+
+    const prevX = _copiedPhoto.photo.x !== undefined ? _copiedPhoto.photo.x : 100;
+    const prevY = _copiedPhoto.photo.y !== undefined ? _copiedPhoto.photo.y : 100;
+    const newX = prevX + 30;
+    const newY = prevY + 30;
+
+    _copiedPhoto.photo.x = newX;
+    _copiedPhoto.photo.y = newY;
+
+    const dropCoords = { x: newX, y: newY, isWorld: true };
+    await addPhotos([_copiedPhoto.blob], dropCoords);
+
+    if (typeof showFocusNotification === 'function') {
+      showFocusNotification("Pasted Photo onto Whiteboard");
+    }
   }
 });
 
@@ -1677,6 +2105,82 @@ if (closeTodo) {
   });
 }
 
+function makeWidgetDraggable(widgetEl, storageKeyPrefix) {
+  if (!widgetEl) return;
+
+  async function restorePosition() {
+    const savedPos = await store.get(storageKeyPrefix + 'Pos', null);
+    if (savedPos && savedPos.left !== undefined && savedPos.top !== undefined) {
+      widgetEl.style.left = savedPos.left + 'px';
+      widgetEl.style.top = savedPos.top + 'px';
+      widgetEl.style.right = 'auto';
+      widgetEl.style.bottom = 'auto';
+    }
+  }
+  restorePosition();
+
+  let isDragging = false;
+  let startX = 0, startY = 0;
+  let initialLeft = 0, initialTop = 0;
+
+  widgetEl.addEventListener('pointerdown', (e) => {
+    if (e.target.closest('button') || e.target.closest('.clock-todo-checkbox') || e.target.closest('a') || e.target.closest('input')) {
+      return;
+    }
+    e.preventDefault();
+    isDragging = true;
+    widgetEl.classList.add('dragging');
+
+    const rect = widgetEl.getBoundingClientRect();
+    initialLeft = rect.left;
+    initialTop = rect.top;
+
+    startX = e.clientX;
+    startY = e.clientY;
+
+    widgetEl.setPointerCapture(e.pointerId);
+
+    function onPointerMove(ev) {
+      if (!isDragging) return;
+      const dx = ev.clientX - startX;
+      const dy = ev.clientY - startY;
+
+      let newLeft = initialLeft + dx;
+      let newTop = initialTop + dy;
+
+      const margin = 10;
+      newLeft = Math.max(margin, Math.min(window.innerWidth - rect.width - margin, newLeft));
+      newTop = Math.max(margin, Math.min(window.innerHeight - rect.height - margin, newTop));
+
+      widgetEl.style.left = newLeft + 'px';
+      widgetEl.style.top = newTop + 'px';
+      widgetEl.style.right = 'auto';
+      widgetEl.style.bottom = 'auto';
+    }
+
+    async function onPointerUp() {
+      if (!isDragging) return;
+      isDragging = false;
+      widgetEl.classList.remove('dragging');
+      try {
+        widgetEl.releasePointerCapture(e.pointerId);
+      } catch (err) { }
+
+      widgetEl.removeEventListener('pointermove', onPointerMove);
+      widgetEl.removeEventListener('pointerup', onPointerUp);
+
+      const rectAfter = widgetEl.getBoundingClientRect();
+      await store.set(storageKeyPrefix + 'Pos', {
+        left: Math.round(rectAfter.left),
+        top: Math.round(rectAfter.top)
+      });
+    }
+
+    widgetEl.addEventListener('pointermove', onPointerMove);
+    widgetEl.addEventListener('pointerup', onPointerUp);
+  });
+}
+
 async function initTodos() {
   todos = await store.get('todos', []);
   renderTodos();
@@ -1827,6 +2331,83 @@ function renderTodos() {
 
     todoListEl.appendChild(li);
   });
+
+  renderClockWidgetTodos();
+}
+
+function renderClockWidgetTodos() {
+  const clockTodoList = document.getElementById('clockTodoList');
+  if (!clockTodoList) return;
+
+  clockTodoList.innerHTML = '';
+
+  const pendingTodos = todos.filter(t => !t.completed);
+
+  if (pendingTodos.length === 0) {
+    const empty = document.createElement('li');
+    empty.className = 'clock-todo-empty';
+    empty.textContent = 'All caught up!';
+    clockTodoList.appendChild(empty);
+  } else {
+    const MAX_VISIBLE = 4;
+    const visible = pendingTodos.slice(0, MAX_VISIBLE);
+
+    visible.forEach(todo => {
+      const li = document.createElement('li');
+      li.className = 'clock-todo-item';
+
+      const checkbox = document.createElement('div');
+      checkbox.className = 'clock-todo-checkbox';
+      checkbox.title = 'Complete task';
+      checkbox.addEventListener('click', async (e) => {
+        e.stopPropagation();
+        todo.completed = true;
+        await saveTodos();
+        renderTodos();
+      });
+
+      const text = document.createElement('span');
+      text.className = 'clock-todo-text';
+      text.textContent = todo.text;
+      text.title = todo.text;
+
+      const dot = document.createElement('span');
+      dot.className = `clock-todo-dot priority-${todo.priority || 'medium'}`;
+      dot.title = `${todo.priority || 'medium'} priority`;
+
+      li.appendChild(checkbox);
+      li.appendChild(text);
+      li.appendChild(dot);
+
+      clockTodoList.appendChild(li);
+    });
+  }
+
+  const overflow = pendingTodos.length - 4;
+  const moreBtn = document.getElementById('clockTodoOpenDrawerBtn');
+  if (moreBtn) {
+    if (overflow > 0) {
+      moreBtn.textContent = `+${overflow} more`;
+    } else {
+      moreBtn.textContent = 'View All';
+    }
+  }
+}
+
+const clockTodoOpenDrawerBtn = document.getElementById('clockTodoOpenDrawerBtn');
+if (clockTodoOpenDrawerBtn) {
+  clockTodoOpenDrawerBtn.addEventListener('click', () => {
+    const todoDrawer = document.getElementById('todoDrawer');
+    const bgSettingsDrawer = document.getElementById('bgSettingsDrawer');
+    const bookmarksDrawer = document.getElementById('bookmarksDrawer');
+    if (bgSettingsDrawer) bgSettingsDrawer.classList.remove('open');
+    if (bookmarksDrawer) bookmarksDrawer.classList.remove('open');
+    if (todoDrawer) {
+      todoDrawer.classList.add('open');
+      const todoInput = document.getElementById('todoInput');
+      if (todoInput) todoInput.focus();
+    }
+  });
 }
 
 async function handleAddTodo() {
@@ -1945,243 +2526,8 @@ lockBoardBtn.addEventListener('click', async () => {
   await store.set('boardLocked', next);
 });
 
-const bgSettingsToggleBtn = document.getElementById('bgSettingsToggleBtn');
-const bgSettingsDrawer = document.getElementById('bgSettingsDrawer');
-const closeBgSettings = document.getElementById('closeBgSettings');
-const bgDropZone = document.getElementById('bgDropZone');
-const bgFileInput = document.getElementById('bgFileInput');
-const bgDimSlider = document.getElementById('bgDimSlider');
-const bgDimValue = document.getElementById('bgDimValue');
-const bgBlurSlider = document.getElementById('bgBlurSlider');
-const bgBlurValue = document.getElementById('bgBlurValue');
-const clearBgBtn = document.getElementById('clearBgBtn');
-const screenBgContainer = document.getElementById('screenBgContainer');
-const screenBgOverlay = document.getElementById('screenBgOverlay');
-
-bgSettingsToggleBtn.addEventListener('click', () => {
-  const todoDrawer = document.getElementById('todoDrawer');
-  if (todoDrawer) todoDrawer.classList.remove('open');
-  bookmarksDrawer.classList.remove('open');
-  bgSettingsDrawer.classList.toggle('open');
-});
-
-closeBgSettings.addEventListener('click', () => {
-  bgSettingsDrawer.classList.remove('open');
-});
-
-bgDropZone.addEventListener('click', () => {
-  bgFileInput.click();
-});
-
-bgDropZone.addEventListener('dragenter', (e) => {
-  e.preventDefault();
-  e.stopPropagation();
-  bgDropZone.classList.add('dragover');
-});
-
-bgDropZone.addEventListener('dragover', (e) => {
-  e.preventDefault();
-  e.stopPropagation();
-  bgDropZone.classList.add('dragover');
-});
-
-bgDropZone.addEventListener('dragleave', (e) => {
-  e.preventDefault();
-  e.stopPropagation();
-  bgDropZone.classList.remove('dragover');
-});
-
-bgDropZone.addEventListener('drop', async (e) => {
-  e.preventDefault();
-  e.stopPropagation();
-  bgDropZone.classList.remove('dragover');
-
-  const files = [...e.dataTransfer.files];
-  if (files.length > 0) {
-    await processAndSetBackground(files[0]);
-  }
-});
-
-bgFileInput.addEventListener('change', async (e) => {
-  const files = [...e.target.files];
-  if (files.length > 0) {
-    await processAndSetBackground(files[0]);
-  }
-  bgFileInput.value = '';
-});
-
-async function downscaleBgImage(file, maxSide = 1600) {
-  return new Promise((resolve) => {
-    if (!file.type.startsWith('image/')) {
-      resolve(file);
-      return;
-    }
-    const img = new Image();
-    const tempUrl = URL.createObjectURL(file);
-    img.onload = () => {
-      URL.revokeObjectURL(tempUrl);
-      const w = img.naturalWidth;
-      const h = img.naturalHeight;
-      if (w <= maxSide && h <= maxSide) {
-        resolve(file);
-        return;
-      }
-      let newW, newH;
-      if (w >= h) {
-        newW = maxSide;
-        newH = Math.round(maxSide * (h / w));
-      } else {
-        newH = maxSide;
-        newW = Math.round(maxSide * (w / h));
-      }
-      const canvas = document.createElement('canvas');
-      canvas.width = newW;
-      canvas.height = newH;
-      const ctx = canvas.getContext('2d');
-      ctx.drawImage(img, 0, 0, newW, newH);
-      canvas.toBlob((blob) => {
-        if (blob) {
-          resolve(new File([blob], file.name, { type: file.type || 'image/jpeg' }));
-        } else {
-          resolve(file);
-        }
-      }, file.type || 'image/jpeg', 0.85);
-    };
-    img.onerror = () => {
-      URL.revokeObjectURL(tempUrl);
-      resolve(file);
-    };
-    img.src = tempUrl;
-  });
-}
-
-async function processAndSetBackground(rawFile) {
-  if (!rawFile.type.startsWith('image/')) return;
-
-  const file = await downscaleBgImage(rawFile);
-
-  await largeStore.set('bgImage', file);
-  await store.set('bgImage', 'MIGRATED');
-  applyBgImage(file);
-}
-
-let bgObjectUrl = null;
-function applyBgImage(src) {
-  if (bgObjectUrl) {
-    URL.revokeObjectURL(bgObjectUrl);
-    bgObjectUrl = null;
-  }
-  const container = document.getElementById('screenBgContainer');
-  if (!container) return;
-
-  if (src) {
-    let targetUrl = '';
-    if (src instanceof Blob) {
-      bgObjectUrl = URL.createObjectURL(src);
-      targetUrl = bgObjectUrl;
-    } else {
-      targetUrl = src;
-    }
-
-    // Trigger smooth fade transition by preloading the image
-    const tempImg = new Image();
-    tempImg.onload = () => {
-      container.style.opacity = '0';
-      setTimeout(() => {
-        container.style.backgroundImage = `url(${targetUrl})`;
-        container.style.opacity = '1';
-      }, 250);
-    };
-    tempImg.src = targetUrl;
-
-    clearBgBtn.removeAttribute('disabled');
-  } else {
-    container.style.opacity = '0';
-    setTimeout(() => {
-      container.style.backgroundImage = 'none';
-      container.style.opacity = '1';
-    }, 250);
-    clearBgBtn.setAttribute('disabled', 'true');
-  }
-}
-
-bgDimSlider.addEventListener('input', (e) => {
-  const val = e.target.value;
-  bgDimValue.textContent = `${val}%`;
-  const extraDim = (typeof timerState !== 'undefined' && timerState === 'running') ? 15 : 0;
-  const finalDim = Math.min(100, parseInt(val) + extraDim);
-  if (screenBgOverlay) {
-    screenBgOverlay.style.opacity = finalDim / 100;
-  }
-});
-
-bgDimSlider.addEventListener('change', async (e) => {
-  await store.set('bgDim', e.target.value);
-});
-
-bgBlurSlider.addEventListener('input', async (e) => {
-  const val = e.target.value;
-  bgBlurValue.textContent = `${val}px`;
-  screenBgContainer.style.filter = val > 0 ? `blur(${val}px)` : 'none';
-});
-
-bgBlurSlider.addEventListener('change', async (e) => {
-  await store.set('bgBlur', e.target.value);
-});
-
-clearBgBtn.addEventListener('click', async () => {
-  const confirmed = await ModalManager.confirm('Remove the screen background?');
-  if (!confirmed) return;
-
-  await store.setMultiple({
-    bgImage: null,
-    bgDim: 0,
-    bgBlur: 0
-  });
-  await largeStore.delete('bgImage');
-
-  applyBgImage(null);
-
-  bgDimSlider.value = 0;
-  bgDimValue.textContent = '0%';
-  screenBgOverlay.style.opacity = 0;
-
-  bgBlurSlider.value = 0;
-  bgBlurValue.textContent = '0px';
-  screenBgContainer.style.filter = 'none';
-});
-
 async function initBackground() {
-  let src = await store.get('bgImage', null);
-
-  if (src === 'MIGRATED') {
-    src = await largeStore.get('bgImage', null);
-  } else if (src && typeof src === 'string' && src.startsWith('data:')) {
-    const blob = dataURLtoBlob(src);
-    if (blob) {
-      await largeStore.set('bgImage', blob);
-      await store.set('bgImage', 'MIGRATED');
-      src = blob;
-    }
-  }
-
-  const dim = await store.get('bgDim', 0);
-  const blur = await store.get('bgBlur', 0);
-
-  applyBgImage(src);
-
-  bgDimSlider.value = dim;
-  bgDimValue.textContent = `${dim}%`;
-
-  if (typeof applyDimnessState === 'function') {
-    await applyDimnessState();
-  } else {
-    screenBgOverlay.style.opacity = dim / 100;
-  }
-
-  bgBlurSlider.value = blur;
-  bgBlurValue.textContent = `${blur}px`;
-  screenBgContainer.style.filter = blur > 0 ? `blur(${blur}px)` : 'none';
+  // Background image feature removed
 }
 
 async function migrateLegacyData() {
@@ -2249,45 +2595,53 @@ function initMagneticToolbarButtons() {
 }
 
 async function startupInit() {
-  await migrateLegacyData();
-  await initBackground();
-  await initTheme();
-  await initClock();
+  try { await migrateLegacyData(); } catch (e) { console.error("startupInit migrateLegacyData:", e); }
+  try { await initCanvasTransform(); } catch (e) { console.error("startupInit initCanvasTransform:", e); }
+  try { await initBackground(); } catch (e) { console.error("startupInit initBackground:", e); }
+  try { await initTheme(); } catch (e) { console.error("startupInit initTheme:", e); }
+  try { await initClock(); } catch (e) { console.error("startupInit initClock:", e); }
 
-  if (typeof initFocusMode === 'function') {
-    await initFocusMode();
-  }
+  try {
+    if (typeof initFocusMode === 'function') {
+      await initFocusMode();
+    }
+  } catch (e) { console.error("startupInit initFocusMode:", e); }
 
-  await initLockState();
-  await initTodos();
-  initMagneticToolbarButtons();
+  try { await initLockState(); } catch (e) { console.error("startupInit initLockState:", e); }
+  try { await initTodos(); } catch (e) { console.error("startupInit initTodos:", e); }
+  try { initMagneticToolbarButtons(); } catch (e) { console.error("startupInit initMagneticToolbarButtons:", e); }
 
-  if (typeof renderBoard === 'function') {
-    await renderBoard();
-  }
+  try {
+    if (typeof renderBoard === 'function') {
+      await renderBoard();
+    }
+  } catch (e) { console.error("startupInit renderBoard:", e); }
 }
 
 let is24HourClock = false;
 
 async function initClock() {
-  is24HourClock = await store.get('clock24HourFormat', false);
   const clockView = document.getElementById('clockView');
-  if (clockView) {
-    clockView.addEventListener('click', async () => {
-      is24HourClock = !is24HourClock;
-      await store.set('clock24HourFormat', is24HourClock);
-      tickClock();
-      if (typeof showFocusNotification === 'function') {
-        showFocusNotification(is24HourClock ? "24-Hour Format Active" : "12-Hour Format Active");
-      }
-    });
-  }
+  if (!clockView) return;
+  is24HourClock = await store.get('clock24HourFormat', false);
+  clockView.addEventListener('click', async () => {
+    is24HourClock = !is24HourClock;
+    await store.set('clock24HourFormat', is24HourClock);
+    tickClock();
+    if (typeof showFocusNotification === 'function') {
+      showFocusNotification(is24HourClock ? "24-Hour Format Active" : "12-Hour Format Active");
+    }
+  });
   tickClock();
 }
 
 function tickClock() {
+  const hoursEl = document.getElementById('clockHours');
+  const minutesEl = document.getElementById('clockMinutes');
+  if (!hoursEl || !minutesEl) return;
   const now = new Date();
-  let h = now.getHours();
+  const rawHours = now.getHours();
+  let h = rawHours;
   const m = now.getMinutes().toString().padStart(2, '0');
   let ampmStr = '';
 
@@ -2299,12 +2653,8 @@ function tickClock() {
     if (h === 0) h = 12;
   }
 
-  const hoursEl = document.getElementById('clockHours');
-  const minutesEl = document.getElementById('clockMinutes');
-  if (hoursEl && minutesEl) {
-    hoursEl.textContent = is24HourClock ? h.toString().padStart(2, '0') : h.toString().padStart(2, '0');
-    minutesEl.textContent = m;
-  }
+  hoursEl.textContent = is24HourClock ? rawHours.toString().padStart(2, '0') : h.toString().padStart(2, '0');
+  minutesEl.textContent = m;
 
   const ampmSpan = document.getElementById('ampm');
   if (ampmSpan) {
@@ -2357,27 +2707,6 @@ function initSearch() {
     renderSuggestions();
   }
 
-  function fallbackMockSuggestions(query) {
-    const mockSites = [
-      { title: "Google Translate", url: "https://translate.google.com", type: "topsite" },
-      { title: "GitHub Code", url: "https://github.com", type: "bookmark" },
-      { title: "Reddit", url: "https://reddit.com", type: "topsite" },
-      { title: "Wikipedia", url: "https://wikipedia.org", type: "topsite" },
-      { title: "Google Docs", url: "https://docs.google.com", type: "bookmark" },
-      { title: "Netflix", url: "https://netflix.com", type: "topsite" },
-      { title: "Amazon Shop", url: "https://amazon.com", type: "topsite" }
-    ];
-
-    suggestions = mockSites
-      .filter(item => {
-        const q = query.toLowerCase();
-        return item.title.toLowerCase().includes(q) || item.url.toLowerCase().includes(q);
-      })
-      .slice(0, 6);
-
-    renderSuggestions();
-  }
-
   async function fetchSuggestions(query) {
     if (!query) {
       if (window.chrome && chrome.topSites && chrome.topSites.get) {
@@ -2409,18 +2738,7 @@ function initSearch() {
             );
           });
         } else {
-          const mock = [
-            { title: 'Google', url: 'https://google.com' },
-            { title: 'Brave Search', url: 'https://search.brave.com' },
-            { title: 'GitHub', url: 'https://github.com' },
-            { title: 'Hacker News', url: 'https://news.ycombinator.com' },
-            { title: 'YouTube', url: 'https://youtube.com' }
-          ];
-          const matched = mock.filter(item => {
-            const q = query.toLowerCase();
-            return item.title.toLowerCase().includes(q) || item.url.toLowerCase().includes(q);
-          }).map(item => ({ ...item, type: 'bookmark' }));
-          resolve(matched);
+          resolve([]);
         }
       });
     };
@@ -2442,18 +2760,7 @@ function initSearch() {
             );
           });
         } else {
-          const mockSites = [
-            { title: "Google Translate", url: "https://translate.google.com" },
-            { title: "Reddit", url: "https://reddit.com" },
-            { title: "Wikipedia", url: "https://wikipedia.org" },
-            { title: "Netflix", url: "https://netflix.com" },
-            { title: "Amazon Shop", url: "https://amazon.com" }
-          ];
-          const matched = mockSites.filter(item => {
-            const q = query.toLowerCase();
-            return item.title.toLowerCase().includes(q) || item.url.toLowerCase().includes(q);
-          }).map(item => ({ ...item, type: 'topsite' }));
-          resolve(matched);
+          resolve([]);
         }
       });
     };
@@ -2473,18 +2780,7 @@ function initSearch() {
             }
           });
         } else {
-          const mockQueries = [
-            "how to program", "weather tomorrow", "javascript tutorial", 
-            "what is anti-gravity", "antigravity deepmind", "best developer tools"
-          ];
-          const matched = mockQueries
-            .filter(q => q.toLowerCase().includes(query.toLowerCase()))
-            .map(text => ({
-              title: text,
-              url: `https://www.google.com/search?q=${encodeURIComponent(text)}`,
-              type: 'search'
-            }));
-          resolve(matched);
+          resolve([]);
         }
       });
     };
@@ -2638,15 +2934,17 @@ function initSearch() {
   const searchOverlay = document.getElementById('searchOverlay');
   if (searchOverlay) {
     searchOverlay.addEventListener('mousedown', (e) => {
-      e.preventDefault(); // Prevents instant blur layout shifts during mousedown
+      e.preventDefault();
       hideSuggestions();
       searchInput.blur();
     });
   }
 }
 
-tickClock();
-setInterval(tickClock, 1000);
+if (document.getElementById('clockHours')) {
+  tickClock();
+  setInterval(tickClock, 1000);
+}
 
 initSearch();
 startupInit();

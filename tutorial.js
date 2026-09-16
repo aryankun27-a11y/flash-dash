@@ -76,7 +76,7 @@
 
   const steps = [
     {
-      title: "Welcome to Flash Dash! ⚡",
+      title: "Welcome to Flash Dash",
       text: "This interactive guide will walk you through your personalized dashboard, vision board, focus tools, and drawer utilities.",
       target: () => null,
       placement: "center",
@@ -85,8 +85,8 @@
       }
     },
     {
-      title: "Main Control Toolbar 🛠️",
-      text: "The vertical toolbar grants quick access to all your tools: pin goal photos, adjust wallpapers, access bookmarks, manage tasks, lock the whiteboard, and toggle theme mode.",
+      title: "Main Control Toolbar",
+      text: "The vertical toolbar grants quick access to all your tools: pin goal photos, recenter your infinite canvas, adjust wallpapers, access bookmarks, manage tasks, lock the whiteboard, and toggle theme mode.",
       target: () => document.getElementById('verticalToolbar'),
       placement: "right",
       onBeforeShow: () => {
@@ -94,7 +94,7 @@
       }
     },
     {
-      title: "Lock Whiteboard 🔒",
+      title: "Lock Whiteboard",
       text: "Click the Lock button to freeze all pinned goal photos on your vision board, preventing accidental dragging or resizing while keeping your layout pristine.",
       target: () => document.getElementById('lockBoardBtn'),
       placement: "right",
@@ -103,7 +103,7 @@
       }
     },
     {
-      title: "Chrome Bookmarks Drawer 🔖",
+      title: "Chrome Bookmarks Drawer",
       text: "Click the Bookmarks icon to open your full Chrome bookmarks directory. Supports instant text search filtering for fast link navigation.",
       target: () => {
         const d = document.getElementById('bookmarksDrawer');
@@ -120,7 +120,7 @@
       }
     },
     {
-      title: "Interactive Tasks Drawer ✅",
+      title: "Interactive Tasks Drawer",
       text: "Keep track of daily goals with priority tags (Low, Medium, High), animated checkmark completions, drag-and-drop task reordering, and live task counter badges.",
       target: () => {
         const d = document.getElementById('todoDrawer');
@@ -137,33 +137,7 @@
       }
     },
     {
-      title: "Background & Data Settings 🖼️",
-      text: "Drag & drop custom wallpapers or upload photos here. Fine-tune your screen's background dimness and blur levels, or clear whiteboard images at any time.",
-      target: () => {
-        const d = document.getElementById('bgSettingsDrawer');
-        if (d) d.classList.add('open');
-        return d;
-      },
-      placement: "right",
-      transitionDelay: 350,
-      onBeforeShow: () => {
-        closeAllDrawers();
-      },
-      onAfterHide: () => {
-        closeAllDrawers();
-      }
-    },
-    {
-      title: "Top-Right Clock & Date 🕐",
-      text: "The clean clock sits in the top-right corner, showing current time and date at a glance without cluttering your vision board workspace. Click to toggle 12h / 24h format.",
-      target: () => document.getElementById('clockView'),
-      placement: "left",
-      onBeforeShow: () => {
-        closeAllDrawers();
-      }
-    },
-    {
-      title: "Focus Mode Countdown Timer ⏳",
+      title: "Focus Mode Countdown Timer",
       text: "Double-click anywhere to enter Focus Mode. Select duration presets (10m, 25m, 30m, 45m, 60m), track daily focus streaks, and use quick shortcuts ([Space], [R], [M]).",
       target: () => {
         document.body.classList.add('focus-mode');
@@ -187,15 +161,6 @@
           timerView.style.transform = '';
           timerView.style.pointerEvents = '';
         }
-      }
-    },
-    {
-      title: "Google Search Bar 🔍",
-      text: "Search Google directly from the bottom search bar with real-time query suggestions, keyboard arrow navigation, and matching bookmarks lookup.",
-      target: () => document.getElementById('searchWrapper'),
-      placement: "left",
-      onBeforeShow: () => {
-        closeAllDrawers();
       }
     }
   ];
@@ -230,7 +195,7 @@
     activeTarget = null;
   }
 
-  function endTutorial() {
+  function endTutorial(triggerNote = true) {
     // Run cleanup for current step
     const step = steps[currentStep];
     if (step && typeof step.onAfterHide === 'function') {
@@ -251,19 +216,29 @@
       window.store.set('onboardingCompleted', true);
     }
 
-    // Trigger the personal welcome note modal!
-    setTimeout(showCreatorNote, 300);
+    // Trigger the personal welcome note modal if not seen yet
+    if (triggerNote) {
+      setTimeout(showCreatorNote, 300);
+    }
   }
 
-  function showCreatorNote() {
+  async function showCreatorNote() {
     const noteOverlay = document.getElementById('creatorNoteOverlay');
     const closeBtn = document.getElementById('closeCreatorNoteBtn');
     if (!noteOverlay) return;
 
+    if (window.store) {
+      const creatorNoteSeen = await window.store.get('creatorNoteSeen', false);
+      if (creatorNoteSeen) return;
+    }
+
     noteOverlay.classList.add('visible');
 
-    const closeNote = () => {
+    const closeNote = async () => {
       noteOverlay.classList.remove('visible');
+      if (window.store) {
+        await window.store.set('creatorNoteSeen', true);
+      }
     };
 
     if (closeBtn) {
@@ -340,7 +315,7 @@
         
         // Bring targeted component to front above frosted mask overlay (11000) but below tooltip card (11050)
         activeTarget.style.zIndex = '11010';
-        activeTarget.style.pointerEvents = 'none'; // non-interactive during tour
+        activeTarget.style.pointerEvents = 'auto';
         activeTarget.classList.add('tutorial-highlight-target');
 
         rect = activeTarget.getBoundingClientRect();
@@ -538,16 +513,8 @@
 
   window.addEventListener('keydown', handleKeyDown);
 
-  // Auto start tutorial on clean launches
-  (async function () {
-    if (window.store) {
-      const onboardingCompleted = await window.store.get('onboardingCompleted', false);
-      if (!onboardingCompleted) {
-        // Wait slightly for main UI logic to settle
-        setTimeout(startTutorial, 400);
-      }
-    }
-  })();
+  // Mark onboarding completed and ensure overlay is hidden by default without triggering creator note
+  endTutorial(false);
 
   // Make triggers global for debugging/testing
   window.startTutorial = startTutorial;
