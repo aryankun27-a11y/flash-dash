@@ -2387,11 +2387,6 @@ const DEFAULT_SHORTCUTS = [
 ];
 
 let appShortcuts = [];
-let isReorderingShortcuts = false;
-let draggedShortcutEl = null;
-let holdTimeout = null;
-let holdStartPos = { x: 0, y: 0 };
-let suppressShortcutClick = false;
 
 async function ensureBookmarksLoaded() {
   if (cachedBookmarks && cachedBookmarks.length > 0) return cachedBookmarks;
@@ -2437,7 +2432,8 @@ function renderShortcuts() {
     a.className = 'shortcut-item';
     a.href = item.url;
     a.title = item.title;
-    a.dataset.url = item.url;
+    a.dataset.index = index;
+    a.draggable = true;
 
     const faviconUrl = `https://www.google.com/s2/favicons?sz=64&domain_url=${encodeURIComponent(item.url)}`;
 
@@ -2460,9 +2456,6 @@ function renderShortcuts() {
     del.className = 'shortcut-remove-btn';
     del.innerHTML = '&times;';
     del.title = 'Remove shortcut';
-    del.addEventListener('pointerdown', (e) => {
-      e.stopPropagation();
-    });
     del.addEventListener('click', async (e) => {
       e.preventDefault();
       e.stopPropagation();
@@ -2471,97 +2464,56 @@ function renderShortcuts() {
       renderShortcuts();
     });
 
-    // 150ms hold-to-drag reordering
-    a.addEventListener('pointerdown', (e) => {
-      if (e.button !== 0) return;
+    // Native Drag-and-Drop Reordering
+    a.addEventListener('dragstart', (e) => {
+      e.dataTransfer.effectAllowed = 'move';
+      e.dataTransfer.setData('text/plain', String(index));
+      a.classList.add('is-dragging');
+    });
+
+    a.addEventListener('dragend', () => {
+      a.classList.remove('is-dragging');
+      shortcutsList.querySelectorAll('.shortcut-item').forEach(el => el.classList.remove('drag-over'));
+    });
+
+    a.addEventListener('dragover', (e) => {
+      e.preventDefault();
+      e.dataTransfer.dropEffect = 'move';
+      a.classList.add('drag-over');
+    });
+
+    a.addEventListener('dragleave', () => {
+      a.classList.remove('drag-over');
+    });
+
+    a.addEventListener('drop', async (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      a.classList.remove('drag-over');
+
+      const fromIndex = parseInt(e.dataTransfer.getData('text/plain'), 10);
+      if (!isNaN(fromIndex) && fromIndex !== index && fromIndex >= 0 && fromIndex < appShortcuts.length) {
+        const movedItem = appShortcuts.splice(fromIndex, 1)[0];
+        appShortcuts.splice(index, 0, movedItem);
+        await store.set('appShortcuts', appShortcuts);
+        renderShortcuts();
+      }
+    });
+
+    // Rock-Solid Click Navigation (Instant launching in current or new tab)
+    const handleLaunch = (e) => {
       if (e.target.closest('.shortcut-remove-btn')) return;
+      e.preventDefault();
+      e.stopPropagation();
 
-      holdStartPos = { x: e.clientX, y: e.clientY };
-      a.classList.add('is-holding');
-
-      clearTimeout(holdTimeout);
-      holdTimeout = setTimeout(() => {
-        isReorderingShortcuts = true;
-        draggedShortcutEl = a;
-        a.classList.remove('is-holding');
-        a.classList.add('is-dragging');
-        if (shortcutsContainer) shortcutsContainer.classList.add('is-reordering');
-        try {
-          a.setPointerCapture(e.pointerId);
-        } catch (err) {}
-      }, 150);
-    });
-
-    a.addEventListener('pointermove', (e) => {
-      if (!isReorderingShortcuts) {
-        const dist = Math.hypot(e.clientX - holdStartPos.x, e.clientY - holdStartPos.y);
-        if (dist > 6) {
-          clearTimeout(holdTimeout);
-          a.classList.remove('is-holding');
-        }
-        return;
-      }
-
-      // Live collision reordering with sibling shortcut items
-      const siblings = [...shortcutsList.querySelectorAll('.shortcut-item:not(.is-dragging)')];
-      for (const sib of siblings) {
-        const rect = sib.getBoundingClientRect();
-        if (e.clientX >= rect.left && e.clientX <= rect.right &&
-            e.clientY >= rect.top && e.clientY <= rect.bottom) {
-          const isAfter = (e.clientX - rect.left) > (rect.width / 2);
-          if (isAfter) {
-            shortcutsList.insertBefore(draggedShortcutEl, sib.nextSibling);
-          } else {
-            shortcutsList.insertBefore(draggedShortcutEl, sib);
-          }
-          break;
-        }
-      }
-    });
-
-    const handlePointerRelease = async (e) => {
-      clearTimeout(holdTimeout);
-      a.classList.remove('is-holding');
-
-      if (isReorderingShortcuts && draggedShortcutEl === a) {
-        isReorderingShortcuts = false;
-        suppressShortcutClick = true;
-        setTimeout(() => { suppressShortcutClick = false; }, 200);
-
-        a.classList.remove('is-dragging');
-        if (shortcutsContainer) shortcutsContainer.classList.remove('is-reordering');
-
-        try {
-          if (e && e.target && e.target.releasePointerCapture) {
-            e.target.releasePointerCapture(e.pointerId);
-          }
-        } catch (err) {}
-
-        // Save reordered array from current DOM order
-        const reordered = [];
-        shortcutsList.querySelectorAll('.shortcut-item').forEach(el => {
-          const targetUrl = el.dataset.url || el.getAttribute('href');
-          const itemMatch = appShortcuts.find(s => s.url === targetUrl);
-          if (itemMatch) reordered.push(itemMatch);
-        });
-
-        if (reordered.length === appShortcuts.length) {
-          appShortcuts = reordered;
-          await store.set('appShortcuts', appShortcuts);
-        }
-        draggedShortcutEl = null;
+      if (e.metaKey || e.ctrlKey || e.button === 1) {
+        window.open(item.url, '_blank');
+      } else if (e.button === 0) {
+        window.location.href = item.url;
       }
     };
-
-    a.addEventListener('pointerup', handlePointerRelease);
-    a.addEventListener('pointercancel', handlePointerRelease);
-
-    a.addEventListener('click', (e) => {
-      if (suppressShortcutClick) {
-        e.preventDefault();
-        e.stopPropagation();
-      }
-    });
+    a.addEventListener('click', handleLaunch);
+    a.addEventListener('auxclick', handleLaunch);
 
     a.appendChild(img);
     a.appendChild(del);
