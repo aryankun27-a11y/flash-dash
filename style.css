@@ -965,32 +965,22 @@ body.focus-mode .stage {
   border-color: var(--text-dim);
 }
 
-/* ---------- Collapsible Tasks Card (In Top-Right Dock) ---------- */
+/* ---------- Collapsible Tasks Section (Inside Unified Capsule) ---------- */
 .dock-tasks-card {
   width: 100%;
-  background: var(--glass);
-  border: 1px solid var(--border);
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
-  border-radius: 16px;
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.18);
+  background: transparent;
+  border: none;
+  border-top: 1px solid var(--border);
+  box-shadow: none;
+  border-radius: 0;
   overflow: hidden;
-  transition: border-color 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease;
-}
-
-.dock-tasks-card:hover {
-  border-color: rgba(255, 255, 255, 0.12);
-}
-
-[data-theme="light"] .dock-tasks-card:hover {
-  border-color: rgba(0, 0, 0, 0.12);
 }
 
 .dock-tasks-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 11px 14px;
+  padding: 10px 16px;
   cursor: pointer;
   user-select: none;
   -webkit-user-select: none;
@@ -998,50 +988,58 @@ body.focus-mode .stage {
 }
 
 .dock-tasks-header:hover {
-  background: var(--glass-strong);
+  background: rgba(255, 255, 255, 0.03);
+}
+
+[data-theme="light"] .dock-tasks-header:hover {
+  background: rgba(0, 0, 0, 0.025);
 }
 
 .dock-tasks-title-group {
   display: flex;
   align-items: center;
-  gap: 8px;
-  font-size: 13px;
+  gap: 7px;
+  font-size: 12.5px;
   font-weight: 600;
   color: var(--text);
-  letter-spacing: -0.2px;
+  letter-spacing: -0.15px;
 }
 
 .dock-tasks-icon {
   color: var(--text-dim);
-  transition: color 0.15s ease;
+  opacity: 0.75;
+  transition: opacity 0.15s ease, color 0.15s ease;
 }
 
 .dock-tasks-header:hover .dock-tasks-icon {
+  opacity: 1;
   color: var(--text);
 }
 
 .dock-tasks-badge {
   font-size: 10px;
-  font-weight: 700;
-  padding: 2px 7px;
-  border-radius: 10px;
-  background: rgba(239, 68, 68, 0.18);
-  color: #ef4444;
+  font-weight: 600;
+  padding: 1.5px 7px;
+  border-radius: 20px;
+  background: rgba(248, 113, 113, 0.12);
+  color: #f87171;
   letter-spacing: 0.2px;
   transition: all 0.2s ease;
 }
 
 .dock-tasks-badge.zero {
-  background: rgba(74, 222, 128, 0.16);
+  background: rgba(74, 222, 128, 0.12);
   color: #4ade80;
 }
 
 .dock-tasks-chevron {
   color: var(--text-dim);
-  transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1), color 0.15s ease;
+  transition: transform 0.22s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.15s ease;
+  opacity: 0.65;
 }
 
 .dock-tasks-header:hover .dock-tasks-chevron {
+  opacity: 1;
   color: var(--text);
 }
 
@@ -1050,11 +1048,11 @@ body.focus-mode .stage {
 }
 
 .dock-tasks-collapse {
-  max-height: 52vh;
+  max-height: 48vh;
   opacity: 1;
   overflow-y: auto;
-  transition: max-height 0.32s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.22s ease, padding 0.22s ease;
-  padding: 4px 14px 14px;
+  transition: max-height 0.3s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.2s ease, padding 0.2s ease;
+  padding: 2px 14px 12px;
   scrollbar-width: thin;
   scrollbar-color: var(--border) transparent;
 }
@@ -1461,96 +1459,108 @@ body.focus-mode .stage {
 
 
 
-/* ---------- Top-Right Unified Clock & Tasks Dock ---------- */
+/* ---------- Top-Right Unified Capsule (Clock & Tasks) ---------- */
 .top-right-dock {
   position: fixed;
   top: 24px;
   right: 28px;
-  width: 280px;
+  width: 275px;
   z-index: 100;
   display: flex;
   flex-direction: column;
-  gap: 10px;
-  pointer-events: none;
-  transition: opacity 0.3s ease, transform 0.3s ease;
+  background: var(--glass);
+  border: 1px solid var(--border);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border-radius: 18px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.22), 0 1px 3px rgba(0, 0, 0, 0.12);
+  overflow: hidden;
+  pointer-events: auto;
+  transition: opacity 0.35s cubic-bezier(0.16, 1, 0.3, 1),
+    transform 0.35s cubic-bezier(0.16, 1, 0.3, 1),
+    border-color 0.2s ease,
+    box-shadow 0.2s ease;
 }
 
-.top-right-dock>* {
-  pointer-events: auto;
+[data-theme="light"] .top-right-dock {
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.06), 0 1px 3px rgba(0, 0, 0, 0.04);
+}
+
+.top-right-dock:hover {
+  border-color: rgba(255, 255, 255, 0.12);
+}
+
+[data-theme="light"] .top-right-dock:hover {
+  border-color: rgba(0, 0, 0, 0.12);
 }
 
 body.focus-mode .top-right-dock {
   opacity: 0 !important;
-  transform: translateY(-16px) scale(0.9) !important;
+  transform: translateY(-16px) scale(0.95) !important;
   pointer-events: none !important;
 }
 
 .clock-widget {
   position: relative;
-  top: auto;
-  right: auto;
   width: 100%;
-  z-index: 1;
   display: flex;
   flex-direction: column;
   align-items: flex-end;
-  gap: 2px;
-  padding: 12px 14px;
-  background: var(--glass);
-  border: 1px solid var(--border);
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
-  border-radius: 16px;
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.18);
-  color: var(--text);
+  gap: 3px;
+  padding: 14px 16px 12px;
+  background: transparent;
+  border: none;
+  box-shadow: none;
+  border-radius: 0;
   cursor: pointer;
   user-select: none;
   -webkit-user-select: none;
-  transition: opacity 0.3s ease, transform 0.2s ease, background 0.2s ease, border-color 0.2s ease;
-  pointer-events: auto;
-  text-align: right;
+  transition: background 0.15s ease;
 }
 
 .clock-widget:hover {
-  background: var(--glass-strong);
-  border-color: rgba(255, 255, 255, 0.12);
-  transform: scale(1.02);
+  background: rgba(255, 255, 255, 0.02);
+  transform: none;
 }
 
 [data-theme="light"] .clock-widget:hover {
-  border-color: rgba(0, 0, 0, 0.12);
+  background: rgba(0, 0, 0, 0.02);
 }
 
 .clock-time {
-  font-family: 'Space Grotesk', sans-serif;
-  font-weight: 700;
-  font-size: 44px;
+  font-family: 'Space Grotesk', -apple-system, sans-serif;
+  font-weight: 600;
+  font-size: 38px;
   line-height: 1;
   color: var(--text);
-  letter-spacing: -1px;
+  letter-spacing: -0.6px;
+  font-variant-numeric: tabular-nums;
+  display: flex;
+  align-items: baseline;
 }
 
 .clock-colon {
   display: inline-block;
   color: var(--text);
-  opacity: 1;
-  margin: 0 1px;
+  opacity: 0.85;
+  margin: 0 1.5px;
+  font-weight: 500;
 }
 
 .clock-ampm {
-  font-size: 15px;
-  font-weight: 600;
-  color: var(--text);
-  opacity: 1;
-  margin-left: 4px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-dim);
+  margin-left: 5px;
   text-transform: uppercase;
+  letter-spacing: 0.5px;
 }
 
 .clock-date {
-  font-size: 13.5px;
+  font-size: 12px;
   color: var(--text-dim);
   font-weight: 500;
-  letter-spacing: 0.3px;
+  letter-spacing: 0.2px;
 }
 
 /* Strict theme text color overrides */
@@ -1558,14 +1568,14 @@ body.focus-mode .top-right-dock {
 [data-theme="light"] .clock-time,
 [data-theme="light"] .clock-colon,
 [data-theme="light"] .clock-ampm {
-  color: #000000 !important;
+  color: #0d0d0d !important;
 }
 
 :root:not([data-theme="light"]) .clock-widget,
 :root:not([data-theme="light"]) .clock-time,
 :root:not([data-theme="light"]) .clock-colon,
 :root:not([data-theme="light"]) .clock-ampm {
-  color: #ffffff !important;
+  color: #f5f5f5 !important;
 }
 
 /* ---------- Focus Mode Countdown Timer Layout ---------- */
