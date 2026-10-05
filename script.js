@@ -2388,37 +2388,47 @@ const DEFAULT_SHORTCUTS = [
 ];
 
 let appShortcuts = [];
+let shortcutsLayoutMode = 'horizontal'; // 'horizontal' | 'square' | 'vertical'
 let isReorderingShortcuts = false;
 let draggedShortcutEl = null;
 let holdTimeout = null;
 let holdStartPos = { x: 0, y: 0 };
 let suppressShortcutClick = false;
 
+function applyShortcutsLayoutMode(mode) {
+  shortcutsLayoutMode = mode;
+  if (!shortcutsContainer) return;
+
+  shortcutsContainer.classList.remove('mode-horizontal', 'mode-square', 'mode-vertical');
+  shortcutsContainer.classList.add(`mode-${mode}`);
+
+  const total = appShortcuts.length;
+  // Compute tight grid dimensions with 0 awkward gaps
+  const horizCols = Math.max(1, total);
+  const squareCols = Math.max(2, Math.round(Math.sqrt(total)));
+
+  shortcutsContainer.style.setProperty('--shortcuts-cols', horizCols);
+  shortcutsContainer.style.setProperty('--shortcuts-square-cols', squareCols);
+}
+
 async function initShortcutsResize() {
-  const savedWidth = await store.get('shortcutsDockWidth', null);
-  if (savedWidth && shortcutsContainer) {
-    if (savedWidth === 'auto') {
-      shortcutsContainer.style.removeProperty('--dock-width');
-    } else {
-      shortcutsContainer.style.setProperty('--dock-width', `${savedWidth}px`);
-    }
-  }
+  const savedMode = await store.get('shortcutsLayoutMode', 'horizontal');
+  applyShortcutsLayoutMode(savedMode);
 
   if (!shortcutsResizeHandle || !shortcutsContainer) return;
 
-  let isResizing = false;
+  let isDraggingHandle = false;
   let startX = 0;
-  let startWidth = 0;
+  let hasMoved = false;
 
   shortcutsResizeHandle.addEventListener('pointerdown', (e) => {
     if (e.button !== 0) return;
     e.preventDefault();
     e.stopPropagation();
-    isResizing = true;
+    isDraggingHandle = true;
+    hasMoved = false;
     startX = e.clientX;
-    startWidth = shortcutsContainer.getBoundingClientRect().width;
     shortcutsContainer.classList.add('is-resizing');
-    document.body.style.cursor = 'ew-resize';
     closeShortcutPicker();
 
     try {
@@ -2427,18 +2437,34 @@ async function initShortcutsResize() {
   });
 
   window.addEventListener('pointermove', (e) => {
-    if (!isResizing) return;
+    if (!isDraggingHandle) return;
     const deltaX = startX - e.clientX;
-    let newWidth = startWidth + deltaX;
-    newWidth = Math.max(48, Math.min(500, newWidth));
-    shortcutsContainer.style.setProperty('--dock-width', `${Math.round(newWidth)}px`);
+    if (Math.abs(deltaX) > 8) {
+      hasMoved = true;
+    }
+
+    // Dynamic threshold snapping between the 3 geometric aspect ratios:
+    // Dragging left (deltaX > 45px) -> Wide Horizontal Rectangle
+    // Dragging right (deltaX < -30px) -> Tall Vertical Rectangle
+    // Neutral/middle -> Balanced Square
+    let targetMode = shortcutsLayoutMode;
+    if (deltaX > 45) {
+      targetMode = 'horizontal';
+    } else if (deltaX < -30) {
+      targetMode = 'vertical';
+    } else {
+      targetMode = 'square';
+    }
+
+    if (targetMode !== shortcutsLayoutMode) {
+      applyShortcutsLayoutMode(targetMode);
+    }
   });
 
-  async function stopResizing(e) {
-    if (!isResizing) return;
-    isResizing = false;
+  const stopHandleDrag = async (e) => {
+    if (!isDraggingHandle) return;
+    isDraggingHandle = false;
     shortcutsContainer.classList.remove('is-resizing');
-    document.body.style.removeProperty('cursor');
 
     try {
       if (e && e.target && e.target.releasePointerCapture) {
@@ -2446,17 +2472,18 @@ async function initShortcutsResize() {
       }
     } catch (err) {}
 
-    const finalWidth = Math.round(shortcutsContainer.getBoundingClientRect().width);
-    if (finalWidth > 420) {
-      shortcutsContainer.style.removeProperty('--dock-width');
-      await store.set('shortcutsDockWidth', 'auto');
-    } else {
-      await store.set('shortcutsDockWidth', finalWidth);
+    // If user clicked or tapped handle without dragging, cycle: horizontal -> square -> vertical
+    if (!hasMoved) {
+      const modes = ['horizontal', 'square', 'vertical'];
+      const nextIdx = (modes.indexOf(shortcutsLayoutMode) + 1) % modes.length;
+      applyShortcutsLayoutMode(modes[nextIdx]);
     }
-  }
 
-  window.addEventListener('pointerup', stopResizing);
-  window.addEventListener('pointercancel', stopResizing);
+    await store.set('shortcutsLayoutMode', shortcutsLayoutMode);
+  };
+
+  window.addEventListener('pointerup', stopHandleDrag);
+  window.addEventListener('pointercancel', stopHandleDrag);
 }
 
 async function ensureBookmarksLoaded() {
@@ -2498,6 +2525,7 @@ async function initShortcuts() {
 function renderShortcuts() {
   if (!shortcutsList) return;
   shortcutsList.innerHTML = '';
+  applyShortcutsLayoutMode(shortcutsLayoutMode);
 
   appShortcuts.forEach((item, index) => {
     const a = document.createElement('a');
