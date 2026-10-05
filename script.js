@@ -2508,6 +2508,207 @@ function initMagneticToolbarButtons() {
   });
 }
 
+// ==========================================
+// 7. APP SHORTCUTS DOCK & BOOKMARK PICKER
+// ==========================================
+
+const shortcutsList = document.getElementById('shortcutsList');
+const addShortcutBtn = document.getElementById('addShortcutBtn');
+const shortcutPickerPopover = document.getElementById('shortcutPickerPopover');
+const closeShortcutPickerBtn = document.getElementById('closeShortcutPickerBtn');
+const shortcutSearchInput = document.getElementById('shortcutSearchInput');
+const pickerBookmarksList = document.getElementById('pickerBookmarksList');
+
+const DEFAULT_SHORTCUTS = [
+  { title: "GitHub", url: "https://github.com" },
+  { title: "YouTube", url: "https://youtube.com" }
+];
+
+let appShortcuts = [];
+
+async function ensureBookmarksLoaded() {
+  if (cachedBookmarks && cachedBookmarks.length > 0) return cachedBookmarks;
+  return new Promise((resolve) => {
+    if (window.chrome && chrome.bookmarks && chrome.bookmarks.getTree) {
+      chrome.bookmarks.getTree((tree) => {
+        const flat = [];
+        function traverse(nodes) {
+          nodes.forEach(node => {
+            if (node.url) flat.push(node);
+            if (node.children) traverse(node.children);
+          });
+        }
+        traverse(tree);
+        cachedBookmarks = flat;
+        resolve(flat);
+      });
+    } else {
+      const mock = [
+        { title: 'Google', url: 'https://google.com' },
+        { title: 'GitHub', url: 'https://github.com' },
+        { title: 'YouTube', url: 'https://youtube.com' },
+        { title: 'Hacker News', url: 'https://news.ycombinator.com' },
+        { title: 'ChatGPT', url: 'https://chatgpt.com' }
+      ];
+      cachedBookmarks = mock;
+      resolve(mock);
+    }
+  });
+}
+
+async function initShortcuts() {
+  appShortcuts = await store.get('appShortcuts', DEFAULT_SHORTCUTS);
+  renderShortcuts();
+}
+
+function renderShortcuts() {
+  if (!shortcutsList) return;
+  shortcutsList.innerHTML = '';
+
+  appShortcuts.forEach((item, index) => {
+    const a = document.createElement('a');
+    a.className = 'shortcut-item';
+    a.href = item.url;
+    a.title = item.title;
+
+    const faviconUrl = `https://www.google.com/s2/favicons?sz=64&domain_url=${encodeURIComponent(item.url)}`;
+
+    const img = document.createElement('img');
+    img.className = 'shortcut-favicon';
+    img.src = faviconUrl;
+    img.alt = item.title;
+    img.onerror = () => {
+      img.style.display = 'none';
+      const fallback = document.createElement('span');
+      fallback.textContent = (item.title || '•').charAt(0).toUpperCase();
+      fallback.style.fontSize = '12px';
+      fallback.style.fontWeight = '600';
+      fallback.style.color = 'var(--text)';
+      a.appendChild(fallback);
+    };
+
+    const del = document.createElement('button');
+    del.className = 'shortcut-remove-btn';
+    del.innerHTML = '&times;';
+    del.title = 'Remove shortcut';
+    del.addEventListener('click', async (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      appShortcuts.splice(index, 1);
+      await store.set('appShortcuts', appShortcuts);
+      renderShortcuts();
+    });
+
+    a.appendChild(img);
+    a.appendChild(del);
+    shortcutsList.appendChild(a);
+  });
+}
+
+async function openShortcutPicker() {
+  if (!shortcutPickerPopover) return;
+  shortcutPickerPopover.classList.add('open');
+  await ensureBookmarksLoaded();
+  if (shortcutSearchInput) {
+    shortcutSearchInput.value = '';
+    shortcutSearchInput.focus();
+  }
+  renderPickerBookmarks();
+}
+
+function closeShortcutPicker() {
+  if (shortcutPickerPopover) {
+    shortcutPickerPopover.classList.remove('open');
+  }
+}
+
+function renderPickerBookmarks() {
+  if (!pickerBookmarksList) return;
+  pickerBookmarksList.innerHTML = '';
+
+  const query = (shortcutSearchInput ? shortcutSearchInput.value : '').toLowerCase().trim();
+  let list = (cachedBookmarks || []).filter(b => b.url && !b.url.startsWith('chrome://'));
+
+  if (query) {
+    list = list.filter(b => (b.title && b.title.toLowerCase().includes(query)) || b.url.toLowerCase().includes(query));
+  }
+
+  if (list.length === 0) {
+    const empty = document.createElement('div');
+    empty.className = 'picker-empty-state';
+    empty.textContent = (!cachedBookmarks || cachedBookmarks.length === 0) ? 'No bookmarks found' : 'No matching bookmarks';
+    pickerBookmarksList.appendChild(empty);
+    return;
+  }
+
+  list.slice(0, 20).forEach(b => {
+    const li = document.createElement('li');
+    li.className = 'picker-bookmark-item';
+
+    const faviconUrl = `https://www.google.com/s2/favicons?sz=32&domain_url=${encodeURIComponent(b.url)}`;
+    const img = document.createElement('img');
+    img.className = 'picker-bookmark-icon';
+    img.src = faviconUrl;
+    img.onerror = () => { img.style.display = 'none'; };
+
+    const span = document.createElement('span');
+    span.className = 'picker-bookmark-title';
+    span.textContent = b.title || b.url;
+
+    li.appendChild(img);
+    li.appendChild(span);
+
+    li.addEventListener('click', async () => {
+      const exists = appShortcuts.some(s => s.url === b.url);
+      if (!exists) {
+        appShortcuts.push({ title: b.title || 'Shortcut', url: b.url });
+        await store.set('appShortcuts', appShortcuts);
+        renderShortcuts();
+      }
+      closeShortcutPicker();
+    });
+
+    pickerBookmarksList.appendChild(li);
+  });
+}
+
+if (addShortcutBtn) {
+  addShortcutBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    if (shortcutPickerPopover && shortcutPickerPopover.classList.contains('open')) {
+      closeShortcutPicker();
+    } else {
+      openShortcutPicker();
+    }
+  });
+}
+
+if (closeShortcutPickerBtn) {
+  closeShortcutPickerBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    closeShortcutPicker();
+  });
+}
+
+if (shortcutSearchInput) {
+  shortcutSearchInput.addEventListener('input', () => {
+    renderPickerBookmarks();
+  });
+  shortcutSearchInput.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') {
+      closeShortcutPicker();
+    }
+  });
+}
+
+document.addEventListener('click', (e) => {
+  if (shortcutPickerPopover && shortcutPickerPopover.classList.contains('open')) {
+    if (!shortcutPickerPopover.contains(e.target) && addShortcutBtn && !addShortcutBtn.contains(e.target)) {
+      closeShortcutPicker();
+    }
+  }
+});
+
 async function startupInit() {
   try { await migrateLegacyData(); } catch (e) { console.error("startupInit migrateLegacyData:", e); }
   try { await initCanvasTransform(); } catch (e) { console.error("startupInit initCanvasTransform:", e); }
@@ -2522,6 +2723,7 @@ async function startupInit() {
 
   try { await initLockState(); } catch (e) { console.error("startupInit initLockState:", e); }
   try { await initTodos(); } catch (e) { console.error("startupInit initTodos:", e); }
+  try { await initShortcuts(); } catch (e) { console.error("startupInit initShortcuts:", e); }
   try { initMagneticToolbarButtons(); } catch (e) { console.error("startupInit initMagneticToolbarButtons:", e); }
 
   try {

@@ -185,6 +185,35 @@
     </div>
   </main>
 
+  <!-- Bottom Right App Shortcuts Dock -->
+  <aside class="bottom-right-dock" id="bottomRightDock">
+    <div class="shortcuts-container" id="shortcutsContainer">
+      <div class="shortcuts-list" id="shortcutsList">
+        <!-- Dynamically rendered shortcut icons -->
+      </div>
+      <button class="shortcut-add-btn" id="addShortcutBtn" title="Add App Shortcut from Bookmarks">
+        <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.2">
+          <line x1="12" y1="5" x2="12" y2="19" />
+          <line x1="5" y1="12" x2="19" y2="12" />
+        </svg>
+      </button>
+    </div>
+
+    <!-- Bookmark Picker Popover -->
+    <div class="shortcut-picker-popover" id="shortcutPickerPopover">
+      <div class="picker-header">
+        <span class="picker-title">Add Shortcut</span>
+        <button class="picker-close-btn" id="closeShortcutPickerBtn" title="Close">&times;</button>
+      </div>
+      <div class="picker-search-container">
+        <input type="text" id="shortcutSearchInput" placeholder="Search bookmarks..." autocomplete="off" spellcheck="false" />
+      </div>
+      <ul class="picker-bookmarks-list" id="pickerBookmarksList">
+        <!-- Populated dynamically from bookmarks -->
+      </ul>
+    </div>
+  </aside>
+
   <!-- Focus Notification Overlay -->
   <div id="focusNotification" class="focus-notification">Focus Mode Active</div>
 
