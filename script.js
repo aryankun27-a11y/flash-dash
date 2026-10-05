@@ -2374,7 +2374,6 @@ function initMagneticToolbarButtons() {
 // ==========================================
 
 const shortcutsContainer = document.getElementById('shortcutsContainer');
-const shortcutsResizeHandle = document.getElementById('shortcutsResizeHandle');
 const shortcutsList = document.getElementById('shortcutsList');
 const addShortcutBtn = document.getElementById('addShortcutBtn');
 const shortcutPickerPopover = document.getElementById('shortcutPickerPopover');
@@ -2388,103 +2387,11 @@ const DEFAULT_SHORTCUTS = [
 ];
 
 let appShortcuts = [];
-let shortcutsLayoutMode = 'horizontal'; // 'horizontal' | 'square' | 'vertical'
 let isReorderingShortcuts = false;
 let draggedShortcutEl = null;
 let holdTimeout = null;
 let holdStartPos = { x: 0, y: 0 };
 let suppressShortcutClick = false;
-
-function applyShortcutsLayoutMode(mode) {
-  shortcutsLayoutMode = mode;
-  if (!shortcutsContainer) return;
-
-  shortcutsContainer.classList.remove('mode-horizontal', 'mode-square', 'mode-vertical');
-  shortcutsContainer.classList.add(`mode-${mode}`);
-
-  const total = appShortcuts.length;
-  // Compute tight grid dimensions with 0 awkward gaps
-  const horizCols = Math.max(1, total);
-  const squareCols = Math.max(2, Math.round(Math.sqrt(total)));
-
-  shortcutsContainer.style.setProperty('--shortcuts-cols', horizCols);
-  shortcutsContainer.style.setProperty('--shortcuts-square-cols', squareCols);
-}
-
-async function initShortcutsResize() {
-  const savedMode = await store.get('shortcutsLayoutMode', 'horizontal');
-  applyShortcutsLayoutMode(savedMode);
-
-  if (!shortcutsResizeHandle || !shortcutsContainer) return;
-
-  let isDraggingHandle = false;
-  let startX = 0;
-  let hasMoved = false;
-
-  shortcutsResizeHandle.addEventListener('pointerdown', (e) => {
-    if (e.button !== 0) return;
-    e.preventDefault();
-    e.stopPropagation();
-    isDraggingHandle = true;
-    hasMoved = false;
-    startX = e.clientX;
-    shortcutsContainer.classList.add('is-resizing');
-    closeShortcutPicker();
-
-    try {
-      shortcutsResizeHandle.setPointerCapture(e.pointerId);
-    } catch (err) {}
-  });
-
-  window.addEventListener('pointermove', (e) => {
-    if (!isDraggingHandle) return;
-    const deltaX = startX - e.clientX;
-    if (Math.abs(deltaX) > 8) {
-      hasMoved = true;
-    }
-
-    // Dynamic threshold snapping between the 3 geometric aspect ratios:
-    // Dragging left (deltaX > 45px) -> Wide Horizontal Rectangle
-    // Dragging right (deltaX < -30px) -> Tall Vertical Rectangle
-    // Neutral/middle -> Balanced Square
-    let targetMode = shortcutsLayoutMode;
-    if (deltaX > 45) {
-      targetMode = 'horizontal';
-    } else if (deltaX < -30) {
-      targetMode = 'vertical';
-    } else {
-      targetMode = 'square';
-    }
-
-    if (targetMode !== shortcutsLayoutMode) {
-      applyShortcutsLayoutMode(targetMode);
-    }
-  });
-
-  const stopHandleDrag = async (e) => {
-    if (!isDraggingHandle) return;
-    isDraggingHandle = false;
-    shortcutsContainer.classList.remove('is-resizing');
-
-    try {
-      if (e && e.target && e.target.releasePointerCapture) {
-        e.target.releasePointerCapture(e.pointerId);
-      }
-    } catch (err) {}
-
-    // If user clicked or tapped handle without dragging, cycle: horizontal -> square -> vertical
-    if (!hasMoved) {
-      const modes = ['horizontal', 'square', 'vertical'];
-      const nextIdx = (modes.indexOf(shortcutsLayoutMode) + 1) % modes.length;
-      applyShortcutsLayoutMode(modes[nextIdx]);
-    }
-
-    await store.set('shortcutsLayoutMode', shortcutsLayoutMode);
-  };
-
-  window.addEventListener('pointerup', stopHandleDrag);
-  window.addEventListener('pointercancel', stopHandleDrag);
-}
 
 async function ensureBookmarksLoaded() {
   if (cachedBookmarks && cachedBookmarks.length > 0) return cachedBookmarks;
@@ -2518,14 +2425,12 @@ async function ensureBookmarksLoaded() {
 
 async function initShortcuts() {
   appShortcuts = await store.get('appShortcuts', DEFAULT_SHORTCUTS);
-  await initShortcutsResize();
   renderShortcuts();
 }
 
 function renderShortcuts() {
   if (!shortcutsList) return;
   shortcutsList.innerHTML = '';
-  applyShortcutsLayoutMode(shortcutsLayoutMode);
 
   appShortcuts.forEach((item, index) => {
     const a = document.createElement('a');
