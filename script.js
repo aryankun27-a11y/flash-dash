@@ -726,18 +726,14 @@ document.addEventListener('keydown', (e) => {
       return;
     }
 
-    let drawerClosed = false;
-    const bookmarksDrawer = document.getElementById('bookmarksDrawer');
-    const todoDrawer = document.getElementById('todoDrawer');
+    let popoverClosed = false;
+    const shortcutPickerPopover = document.getElementById('shortcutPickerPopover');
+    if (shortcutPickerPopover && shortcutPickerPopover.classList.contains('open')) {
+      shortcutPickerPopover.classList.remove('open');
+      popoverClosed = true;
+    }
 
-    [bookmarksDrawer, todoDrawer].forEach(drawer => {
-      if (drawer && drawer.classList.contains('open')) {
-        drawer.classList.remove('open');
-        drawerClosed = true;
-      }
-    });
-
-    if (drawerClosed) return;
+    if (popoverClosed) return;
 
     toggleFocusMode();
   }
@@ -967,9 +963,11 @@ window.addEventListener('pointerdown', (e) => {
   const isBackgroundClick = isLeftClick &&
     !e.target.closest('.photo') &&
     !e.target.closest('.vertical-toolbar') &&
-    !e.target.closest('.slide-drawer') &&
     !e.target.closest('.custom-modal-card') &&
     !e.target.closest('.creator-note-overlay') &&
+    !e.target.closest('.top-right-dock') &&
+    !e.target.closest('.bottom-right-dock') &&
+    !e.target.closest('.shortcut-picker-popover') &&
     !e.target.closest('.tutorial-tour-container');
 
   if (isBackgroundClick) {
@@ -1024,11 +1022,12 @@ window.addEventListener('gestureend', (e) => e.preventDefault());
 
 // Smooth 2D Canvas Panning on Mouse Wheel & Trackpad (360° Freeform Panning)
 window.addEventListener('wheel', (e) => {
-  if (e.target.closest('.slide-drawer') ||
-    e.target.closest('.todo-list') ||
-    e.target.closest('.bookmarks-list') ||
+  if (e.target.closest('.todo-list') ||
     e.target.closest('.creator-note-card') ||
-    e.target.closest('.custom-modal-card')) {
+    e.target.closest('.custom-modal-card') ||
+    e.target.closest('.shortcut-picker-popover') ||
+    e.target.closest('.bottom-right-dock') ||
+    e.target.closest('.top-right-dock')) {
     return;
   }
 
@@ -1457,10 +1456,6 @@ async function renderBoard() {
 
 if (addPhotoBtn && photoInput) {
   addPhotoBtn.addEventListener('click', () => {
-    const bookmarksDrawer = document.getElementById('bookmarksDrawer');
-    const todoDrawer = document.getElementById('todoDrawer');
-    if (bookmarksDrawer) bookmarksDrawer.classList.remove('open');
-    if (todoDrawer) todoDrawer.classList.remove('open');
     photoInput.click();
   });
 }
@@ -1906,138 +1901,7 @@ function getDragAfterElement(container, y, selector) {
 }
 
 
-function faviconUrl(url) {
-  try {
-    if (window.chrome && chrome.runtime && chrome.runtime.id) {
-      return `chrome-extension://${chrome.runtime.id}/_favicon/?pageUrl=${encodeURIComponent(url)}&size=64`;
-    }
-    return '';
-  } catch (e) { return ''; }
-}
-
-const bookmarksToggle = document.getElementById('bookmarksToggle');
-const bookmarksDrawer = document.getElementById('bookmarksDrawer');
-const closeBookmarks = document.getElementById('closeBookmarks');
-const bookmarksList = document.getElementById('bookmarksList');
-const bookmarkSearchInput = document.getElementById('bookmarkSearchInput');
-
 let cachedBookmarks = [];
-
-bookmarksToggle.addEventListener('click', () => {
-  const todoDrawer = document.getElementById('todoDrawer');
-  if (todoDrawer) todoDrawer.classList.remove('open');
-  bookmarksDrawer.classList.toggle('open');
-  if (bookmarksDrawer.classList.contains('open')) {
-    bookmarkSearchInput.value = '';
-    loadBookmarks();
-  }
-});
-
-closeBookmarks.addEventListener('click', () => {
-  bookmarksDrawer.classList.remove('open');
-});
-
-document.addEventListener('click', (e) => {
-  if (bookmarksDrawer && !bookmarksDrawer.contains(e.target) && bookmarksToggle && !bookmarksToggle.contains(e.target)) {
-    bookmarksDrawer.classList.remove('open');
-  }
-});
-
-async function loadBookmarks() {
-  bookmarksList.innerHTML = '';
-
-  if (window.chrome && chrome.bookmarks && chrome.bookmarks.getTree) {
-    chrome.bookmarks.getTree((tree) => {
-      const flat = [];
-      function traverse(nodes) {
-        nodes.forEach(node => {
-          if (node.url) {
-            flat.push(node);
-          }
-          if (node.children) {
-            traverse(node.children);
-          }
-        });
-      }
-      traverse(tree);
-      cachedBookmarks = flat;
-      filterAndRenderBookmarks();
-    });
-  } else {
-    const mock = [
-      { title: 'Google', url: 'https://google.com' },
-      { title: 'Brave Search', url: 'https://search.brave.com' },
-      { title: 'GitHub', url: 'https://github.com' },
-      { title: 'Hacker News', url: 'https://news.ycombinator.com' },
-      { title: 'YouTube', url: 'https://youtube.com' }
-    ];
-    cachedBookmarks = mock;
-    filterAndRenderBookmarks();
-  }
-}
-
-function filterAndRenderBookmarks() {
-  const query = bookmarkSearchInput.value.toLowerCase().trim();
-  if (!query) {
-    renderBookmarksList(cachedBookmarks);
-    return;
-  }
-  const filtered = cachedBookmarks.filter(bm => {
-    const titleMatch = bm.title && bm.title.toLowerCase().includes(query);
-    const urlMatch = bm.url && bm.url.toLowerCase().includes(query);
-    return titleMatch || urlMatch;
-  });
-  renderBookmarksList(filtered);
-}
-
-bookmarkSearchInput.addEventListener('input', filterAndRenderBookmarks);
-
-function renderBookmarksList(bookmarks) {
-  bookmarksList.innerHTML = '';
-  if (bookmarks.length === 0) {
-    const empty = document.createElement('div');
-    empty.className = 'bookmark-empty';
-    empty.textContent = 'No bookmarks found.';
-    bookmarksList.appendChild(empty);
-    return;
-  }
-
-  bookmarks.forEach((bm, index) => {
-    const a = document.createElement('a');
-    a.className = 'bookmark-item';
-    a.style.setProperty('--item-index', index);
-    a.href = bm.url;
-    a.addEventListener('click', (e) => {
-      if (e.metaKey || e.ctrlKey || e.button === 1) {
-        return;
-      }
-      e.preventDefault();
-      window.location.href = bm.url;
-    });
-
-    const img = document.createElement('img');
-    img.className = 'bookmark-icon';
-    img.src = faviconUrl(bm.url);
-    img.alt = '';
-    img.onerror = () => {
-      img.remove();
-      const initial = document.createElement('div');
-      initial.className = 'bookmark-fallback-icon';
-      initial.textContent = bm.title ? bm.title.trim().slice(0, 1).toUpperCase() : 'B';
-      a.insertBefore(initial, a.firstChild);
-    };
-    img.setAttribute('draggable', 'false');
-    a.appendChild(img);
-
-    const title = document.createElement('span');
-    title.className = 'bookmark-title';
-    title.textContent = bm.title || bm.url;
-    title.title = bm.title || bm.url;
-    a.appendChild(title);
-
-    bookmarksList.appendChild(a);
-  });
-}
 
 // ==========================================
 // 6. TASKS / TO-DO LIST (todo.js)
@@ -2067,9 +1931,6 @@ if (dockTasksHeader && dockTasksCard) {
 
 if (todoToggle) {
   todoToggle.addEventListener('click', async () => {
-    const bookmarksDrawer = document.getElementById('bookmarksDrawer');
-    if (bookmarksDrawer) bookmarksDrawer.classList.remove('open');
-
     if (dockTasksCard) {
       if (dockTasksCard.classList.contains('collapsed')) {
         dockTasksCard.classList.remove('collapsed');
@@ -2512,6 +2373,8 @@ function initMagneticToolbarButtons() {
 // 7. APP SHORTCUTS DOCK & BOOKMARK PICKER
 // ==========================================
 
+const shortcutsContainer = document.getElementById('shortcutsContainer');
+const shortcutsResizeHandle = document.getElementById('shortcutsResizeHandle');
 const shortcutsList = document.getElementById('shortcutsList');
 const addShortcutBtn = document.getElementById('addShortcutBtn');
 const shortcutPickerPopover = document.getElementById('shortcutPickerPopover');
@@ -2525,6 +2388,76 @@ const DEFAULT_SHORTCUTS = [
 ];
 
 let appShortcuts = [];
+let isReorderingShortcuts = false;
+let draggedShortcutEl = null;
+let holdTimeout = null;
+let holdStartPos = { x: 0, y: 0 };
+let suppressShortcutClick = false;
+
+async function initShortcutsResize() {
+  const savedWidth = await store.get('shortcutsDockWidth', null);
+  if (savedWidth && shortcutsContainer) {
+    if (savedWidth === 'auto') {
+      shortcutsContainer.style.removeProperty('--dock-width');
+    } else {
+      shortcutsContainer.style.setProperty('--dock-width', `${savedWidth}px`);
+    }
+  }
+
+  if (!shortcutsResizeHandle || !shortcutsContainer) return;
+
+  let isResizing = false;
+  let startX = 0;
+  let startWidth = 0;
+
+  shortcutsResizeHandle.addEventListener('pointerdown', (e) => {
+    if (e.button !== 0) return;
+    e.preventDefault();
+    e.stopPropagation();
+    isResizing = true;
+    startX = e.clientX;
+    startWidth = shortcutsContainer.getBoundingClientRect().width;
+    shortcutsContainer.classList.add('is-resizing');
+    document.body.style.cursor = 'ew-resize';
+    closeShortcutPicker();
+
+    try {
+      shortcutsResizeHandle.setPointerCapture(e.pointerId);
+    } catch (err) {}
+  });
+
+  window.addEventListener('pointermove', (e) => {
+    if (!isResizing) return;
+    const deltaX = startX - e.clientX;
+    let newWidth = startWidth + deltaX;
+    newWidth = Math.max(48, Math.min(500, newWidth));
+    shortcutsContainer.style.setProperty('--dock-width', `${Math.round(newWidth)}px`);
+  });
+
+  async function stopResizing(e) {
+    if (!isResizing) return;
+    isResizing = false;
+    shortcutsContainer.classList.remove('is-resizing');
+    document.body.style.removeProperty('cursor');
+
+    try {
+      if (e && e.target && e.target.releasePointerCapture) {
+        e.target.releasePointerCapture(e.pointerId);
+      }
+    } catch (err) {}
+
+    const finalWidth = Math.round(shortcutsContainer.getBoundingClientRect().width);
+    if (finalWidth > 420) {
+      shortcutsContainer.style.removeProperty('--dock-width');
+      await store.set('shortcutsDockWidth', 'auto');
+    } else {
+      await store.set('shortcutsDockWidth', finalWidth);
+    }
+  }
+
+  window.addEventListener('pointerup', stopResizing);
+  window.addEventListener('pointercancel', stopResizing);
+}
 
 async function ensureBookmarksLoaded() {
   if (cachedBookmarks && cachedBookmarks.length > 0) return cachedBookmarks;
@@ -2558,6 +2491,7 @@ async function ensureBookmarksLoaded() {
 
 async function initShortcuts() {
   appShortcuts = await store.get('appShortcuts', DEFAULT_SHORTCUTS);
+  await initShortcutsResize();
   renderShortcuts();
 }
 
@@ -2570,6 +2504,7 @@ function renderShortcuts() {
     a.className = 'shortcut-item';
     a.href = item.url;
     a.title = item.title;
+    a.dataset.url = item.url;
 
     const faviconUrl = `https://www.google.com/s2/favicons?sz=64&domain_url=${encodeURIComponent(item.url)}`;
 
@@ -2577,6 +2512,7 @@ function renderShortcuts() {
     img.className = 'shortcut-favicon';
     img.src = faviconUrl;
     img.alt = item.title;
+    img.draggable = false;
     img.onerror = () => {
       img.style.display = 'none';
       const fallback = document.createElement('span');
@@ -2591,12 +2527,107 @@ function renderShortcuts() {
     del.className = 'shortcut-remove-btn';
     del.innerHTML = '&times;';
     del.title = 'Remove shortcut';
+    del.addEventListener('pointerdown', (e) => {
+      e.stopPropagation();
+    });
     del.addEventListener('click', async (e) => {
       e.preventDefault();
       e.stopPropagation();
       appShortcuts.splice(index, 1);
       await store.set('appShortcuts', appShortcuts);
       renderShortcuts();
+    });
+
+    // 150ms hold-to-drag reordering
+    a.addEventListener('pointerdown', (e) => {
+      if (e.button !== 0) return;
+      if (e.target.closest('.shortcut-remove-btn')) return;
+
+      holdStartPos = { x: e.clientX, y: e.clientY };
+      a.classList.add('is-holding');
+
+      clearTimeout(holdTimeout);
+      holdTimeout = setTimeout(() => {
+        isReorderingShortcuts = true;
+        draggedShortcutEl = a;
+        a.classList.remove('is-holding');
+        a.classList.add('is-dragging');
+        if (shortcutsContainer) shortcutsContainer.classList.add('is-reordering');
+        try {
+          a.setPointerCapture(e.pointerId);
+        } catch (err) {}
+      }, 150);
+    });
+
+    a.addEventListener('pointermove', (e) => {
+      if (!isReorderingShortcuts) {
+        const dist = Math.hypot(e.clientX - holdStartPos.x, e.clientY - holdStartPos.y);
+        if (dist > 6) {
+          clearTimeout(holdTimeout);
+          a.classList.remove('is-holding');
+        }
+        return;
+      }
+
+      // Live collision reordering with sibling shortcut items
+      const siblings = [...shortcutsList.querySelectorAll('.shortcut-item:not(.is-dragging)')];
+      for (const sib of siblings) {
+        const rect = sib.getBoundingClientRect();
+        if (e.clientX >= rect.left && e.clientX <= rect.right &&
+            e.clientY >= rect.top && e.clientY <= rect.bottom) {
+          const isAfter = (e.clientX - rect.left) > (rect.width / 2);
+          if (isAfter) {
+            shortcutsList.insertBefore(draggedShortcutEl, sib.nextSibling);
+          } else {
+            shortcutsList.insertBefore(draggedShortcutEl, sib);
+          }
+          break;
+        }
+      }
+    });
+
+    const handlePointerRelease = async (e) => {
+      clearTimeout(holdTimeout);
+      a.classList.remove('is-holding');
+
+      if (isReorderingShortcuts && draggedShortcutEl === a) {
+        isReorderingShortcuts = false;
+        suppressShortcutClick = true;
+        setTimeout(() => { suppressShortcutClick = false; }, 200);
+
+        a.classList.remove('is-dragging');
+        if (shortcutsContainer) shortcutsContainer.classList.remove('is-reordering');
+
+        try {
+          if (e && e.target && e.target.releasePointerCapture) {
+            e.target.releasePointerCapture(e.pointerId);
+          }
+        } catch (err) {}
+
+        // Save reordered array from current DOM order
+        const reordered = [];
+        shortcutsList.querySelectorAll('.shortcut-item').forEach(el => {
+          const targetUrl = el.dataset.url || el.getAttribute('href');
+          const itemMatch = appShortcuts.find(s => s.url === targetUrl);
+          if (itemMatch) reordered.push(itemMatch);
+        });
+
+        if (reordered.length === appShortcuts.length) {
+          appShortcuts = reordered;
+          await store.set('appShortcuts', appShortcuts);
+        }
+        draggedShortcutEl = null;
+      }
+    };
+
+    a.addEventListener('pointerup', handlePointerRelease);
+    a.addEventListener('pointercancel', handlePointerRelease);
+
+    a.addEventListener('click', (e) => {
+      if (suppressShortcutClick) {
+        e.preventDefault();
+        e.stopPropagation();
+      }
     });
 
     a.appendChild(img);
@@ -2708,6 +2739,15 @@ document.addEventListener('click', (e) => {
     }
   }
 });
+
+if (shortcutPickerPopover) {
+  shortcutPickerPopover.addEventListener('wheel', (e) => {
+    e.stopPropagation();
+  }, { passive: true });
+  shortcutPickerPopover.addEventListener('pointerdown', (e) => {
+    e.stopPropagation();
+  });
+}
 
 async function startupInit() {
   try { await migrateLegacyData(); } catch (e) { console.error("startupInit migrateLegacyData:", e); }

@@ -49,12 +49,6 @@
         </svg>
       </button>
 
-      <button class="task-btn" id="bookmarksToggle" title="Bookmarks">
-        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8">
-          <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z" />
-        </svg>
-      </button>
-
       <button class="task-btn" id="lockBoardBtn" title="Lock Whiteboard">
         <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8"
           id="lockIcon">
@@ -84,21 +78,6 @@
   </nav>
 
   <input type="file" id="photoInput" accept="image/*" multiple hidden />
-
-  <!-- slide-out bookmarks drawer (slides from left next to toolbar) -->
-  <div class="slide-drawer" id="bookmarksDrawer">
-    <div class="drawer-header">
-      <span class="drawer-title">Bookmarks</span>
-      <button id="closeBookmarks" class="drawer-close">&times;</button>
-    </div>
-    <div class="drawer-search-container">
-      <input type="text" id="bookmarkSearchInput" placeholder="Search bookmarks..." autocomplete="off"
-        spellcheck="false" />
-    </div>
-    <ul class="bookmarks-list" id="bookmarksList">
-      <!-- Dynamically populated bookmarks -->
-    </ul>
-  </div>
 
   <!-- Top-Right Unified Dock: Clock & Tasks -->
   <div class="top-right-dock" id="topRightDock">
@@ -188,6 +167,9 @@
   <!-- Bottom Right App Shortcuts Dock -->
   <aside class="bottom-right-dock" id="bottomRightDock">
     <div class="shortcuts-container" id="shortcutsContainer">
+      <div class="shortcuts-resize-handle" id="shortcutsResizeHandle" title="Drag to adjust shape (horizontal, square, vertical)">
+        <span class="resize-handle-line"></span>
+      </div>
       <div class="shortcuts-list" id="shortcutsList">
         <!-- Dynamically rendered shortcut icons -->
       </div>
