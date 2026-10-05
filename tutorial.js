@@ -45,7 +45,7 @@
     function step(now) {
       const elapsed = now - startTime;
       const progress = Math.min(1, elapsed / duration);
-      
+
       // Easing: easeOutCubic
       const ease = 1 - Math.pow(1 - progress, 3);
 
@@ -77,7 +77,7 @@
   const steps = [
     {
       title: "Welcome to Flash Dash",
-      text: "This interactive guide will walk you through your personalized dashboard, vision board, focus tools, and drawer utilities.",
+      text: "A clean, distraction-free dashboard crafted for focus. Let's take a quick 1-minute tour of your whiteboard vision board, daily tasks, app shortcuts, and focus tools.",
       target: () => null,
       placement: "center",
       onBeforeShow: () => {
@@ -85,8 +85,8 @@
       }
     },
     {
-      title: "Main Control Toolbar",
-      text: "The vertical toolbar grants quick access to your core tools: pin goal photos, recenter your canvas, access bookmarks, lock the whiteboard, clear images, and toggle theme mode.",
+      title: "Vision Board & Left Tools",
+      text: "Pin personal goal photos directly to your infinite whiteboard canvas. Recenter your canvas view anytime, lock the board to prevent accidental dragging, clear images, or switch between dark and light themes.",
       target: () => document.getElementById('verticalToolbar'),
       placement: "right",
       onBeforeShow: () => {
@@ -94,51 +94,31 @@
       }
     },
     {
-      title: "Lock Whiteboard",
-      text: "Click the Lock button to freeze all pinned goal photos on your vision board, preventing accidental dragging or resizing while keeping your layout pristine.",
-      target: () => document.getElementById('lockBoardBtn'),
-      placement: "right",
-      onBeforeShow: () => {
-        closeAllDrawers();
-      }
-    },
-    {
-      title: "Chrome Bookmarks Drawer",
-      text: "Click the Bookmarks icon to open your full Chrome bookmarks directory. Supports instant text search filtering for fast link navigation.",
+      title: "Clock & Daily Tasks",
+      text: "Click the time anytime to toggle between 12-hour and 24-hour formats. Below it, your collapsible task card tracks daily goals with priority tags (Low, Med, High), checkmarks, and hold-to-reorder tasks.",
       target: () => {
-        const d = document.getElementById('bookmarksDrawer');
-        if (d) d.classList.add('open');
-        return d;
-      },
-      placement: "right",
-      transitionDelay: 350,
-      onBeforeShow: () => {
-        closeAllDrawers();
-      },
-      onAfterHide: () => {
-        closeAllDrawers();
-      }
-    },
-    {
-      title: "Interactive Tasks",
-      text: "Keep track of daily goals with priority tags (Low, Medium, High), animated checkmark completions, drag-and-drop task reordering, and live task counter badges right below your clock.",
-      target: () => {
-        const d = document.getElementById('dockTasksCard');
-        if (d) d.classList.remove('collapsed');
-        return d;
+        const card = document.getElementById('dockTasksCard');
+        if (card) card.classList.remove('collapsed');
+        return document.getElementById('topRightDock');
       },
       placement: "left",
-      transitionDelay: 350,
+      transitionDelay: 150,
       onBeforeShow: () => {
-        closeAllDrawers();
-      },
-      onAfterHide: () => {
         closeAllDrawers();
       }
     },
     {
-      title: "Focus Mode Countdown Timer",
-      text: "Double-click anywhere to enter Focus Mode. Select duration presets (10m, 25m, 30m, 45m, 60m), track daily focus streaks, and use quick shortcuts ([Space], [R], [M]).",
+      title: "App Shortcuts Dock",
+      text: "Your favorite web apps are always within reach at the bottom right. Click '+' to search and add links from your Chrome bookmarks, or press & hold any shortcut tile for 150ms to rearrange them.",
+      target: () => document.getElementById('bottomRightDock'),
+      placement: "left",
+      onBeforeShow: () => {
+        closeAllDrawers();
+      }
+    },
+    {
+      title: "Focus Mode & Timer",
+      text: "Double-click the background or the clock anytime to enter distraction-free Focus Mode. Pick countdown presets (10m, 25m, 30m, 45m, 60m), track daily focus streaks, and use quick shortcuts ([Space], [R], [M]).",
       target: () => {
         document.body.classList.add('focus-mode');
         const timerView = document.getElementById('timerView');
@@ -166,11 +146,8 @@
   ];
 
   function closeAllDrawers() {
-    const drawers = ['bookmarksDrawer', 'todoDrawer'];
-    drawers.forEach(id => {
-      const el = document.getElementById(id);
-      if (el) el.classList.remove('open');
-    });
+    const popover = document.getElementById('shortcutPickerPopover');
+    if (popover) popover.classList.remove('open');
   }
 
   function startTutorial() {
@@ -185,18 +162,17 @@
       activeTarget.style.position = activeTarget.dataset.origPosition || '';
       activeTarget.style.zIndex = activeTarget.dataset.origZIndex || '';
       activeTarget.style.pointerEvents = activeTarget.dataset.origPointerEvents || '';
-      
+
       delete activeTarget.dataset.origPosition;
       delete activeTarget.dataset.origZIndex;
       delete activeTarget.dataset.origPointerEvents;
-      
+
       activeTarget.classList.remove('tutorial-highlight-target');
     }
     activeTarget = null;
   }
 
   function endTutorial(triggerNote = true) {
-    // Run cleanup for current step
     const step = steps[currentStep];
     if (step && typeof step.onAfterHide === 'function') {
       step.onAfterHide();
@@ -204,19 +180,15 @@
 
     closeAllDrawers();
 
-    // Hide overlay
     overlay.classList.remove('visible');
     document.body.classList.remove('tutorial-active');
 
-    // Clean target element highlights
     cleanActiveTarget();
 
-    // Persist completed state in storage
     if (window.store) {
       window.store.set('onboardingCompleted', true);
     }
 
-    // Trigger the personal welcome note modal if not seen yet
     if (triggerNote) {
       setTimeout(showCreatorNote, 300);
     }
@@ -225,6 +197,7 @@
   async function showCreatorNote() {
     const noteOverlay = document.getElementById('creatorNoteOverlay');
     const closeBtn = document.getElementById('closeCreatorNoteBtn');
+    const replayBtn = document.getElementById('replayTutorialBtn');
     if (!noteOverlay) return;
 
     if (window.store) {
@@ -243,6 +216,13 @@
 
     if (closeBtn) {
       closeBtn.onclick = closeNote;
+    }
+
+    if (replayBtn) {
+      replayBtn.onclick = () => {
+        closeNote();
+        setTimeout(startTutorial, 250);
+      };
     }
 
     noteOverlay.onclick = (e) => {
@@ -265,10 +245,8 @@
   }
 
   function showStep(index) {
-    // Fade out tooltip card first
     tooltip.classList.remove('visible');
 
-    // Cleanup previous step's highlight and callback
     const prevStep = steps[currentStep];
     if (prevStep && typeof prevStep.onAfterHide === 'function') {
       prevStep.onAfterHide();
@@ -278,12 +256,10 @@
     currentStep = index;
     const step = steps[currentStep];
 
-    // Trigger step preview callback
     if (typeof step.onBeforeShow === 'function') {
       step.onBeforeShow();
     }
 
-    // Update metadata content
     stepIndicator.textContent = `Step ${currentStep + 1} of ${steps.length}`;
     titleEl.textContent = step.title;
     textEl.textContent = step.text;
@@ -291,30 +267,25 @@
 
     renderProgressDots(currentStep);
 
-    // Call target() first to start any drawer animations
     const targetObj = step.target();
     const stepDelay = step.transitionDelay || 50;
 
-    // Wait for drawer transition to complete before measuring and positioning
     setTimeout(() => {
       let rect = null;
-      
+
       if (targetObj && targetObj instanceof HTMLElement) {
         activeTarget = targetObj;
-        
-        // Save original layout styles
+
         activeTarget.dataset.origPosition = activeTarget.style.position || '';
         activeTarget.dataset.origZIndex = activeTarget.style.zIndex || '';
         activeTarget.dataset.origPointerEvents = activeTarget.style.pointerEvents || '';
-        
-        // Make sure it has relative/absolute position so z-index layers correctly
+
         const computedStyle = window.getComputedStyle(activeTarget);
         if (computedStyle.position === 'static') {
           activeTarget.style.position = 'relative';
         }
-        
-        // Bring targeted component to front above frosted mask overlay (11000) but below tooltip card (11050)
-        activeTarget.style.zIndex = '11010';
+
+        activeTarget.style.zIndex = '110010';
         activeTarget.style.pointerEvents = 'auto';
         activeTarget.classList.add('tutorial-highlight-target');
 
@@ -341,40 +312,35 @@
       tTop = (screenH - tHeight) / 2;
       tooltip.style.left = `${tLeft}px`;
       tooltip.style.top = `${tTop}px`;
-      arrowPath.setAttribute('d', ''); // Hide arrow
+      arrowPath.setAttribute('d', '');
       tooltip.classList.add('visible');
-      
-      // Animate cutout smoothly back to center with 0 size
+
       animateCutoutTo(screenW / 2, screenH / 2, 0, 0, 0);
       return;
     }
 
-    const margin = 52; // Distance between card and spotlighted element
+    const margin = 52;
     let arrowStart = { x: 0, y: 0 };
     let arrowEnd = { x: 0, y: 0 };
     let controlPoint = { x: 0, y: 0 };
 
-    // Pad spotlight bounds
     const pad = 8;
     const targetX = rect.left - pad;
     const targetY = rect.top - pad;
     const targetW = rect.width + (pad * 2);
     const targetH = rect.height + (pad * 2);
 
-    // Determine standard premium rounding or pill shape for verticalToolbar
     let radius = 16;
     if (activeTarget && activeTarget.id === 'verticalToolbar') {
       radius = targetW / 2;
     }
 
-    // Smoothly animate the spotlight cutout using Javascript easing
     animateCutoutTo(targetX, targetY, targetW, targetH, radius);
 
     if (placement === 'right') {
       tLeft = targetX + targetW + margin;
       tTop = targetY + (targetH / 2) - (tHeight / 2);
-      
-      // Keep tooltip fully inside window viewport
+
       tLeft = Math.min(screenW - tWidth - 20, Math.max(20, tLeft));
       tTop = Math.min(screenH - tHeight - 20, Math.max(20, tTop));
 
@@ -383,7 +349,6 @@
       arrowEnd.x = targetX + targetW;
       arrowEnd.y = targetY + (targetH / 2);
 
-      // Curved sketchy line control point
       controlPoint.x = (arrowStart.x + arrowEnd.x) / 2;
       controlPoint.y = (arrowStart.y + arrowEnd.y) / 2 - 35;
 
@@ -436,23 +401,19 @@
     tooltip.style.left = `${tLeft}px`;
     tooltip.style.top = `${tTop}px`;
 
-    // Draw sketchy curved arrow using quadratic bezier path
     const arrowD = `M ${arrowStart.x} ${arrowStart.y} Q ${controlPoint.x} ${controlPoint.y} ${arrowEnd.x} ${arrowEnd.y}`;
     arrowPath.setAttribute('d', arrowD);
 
-    // Force arrow animation to replay
     arrowPath.style.animation = 'none';
-    arrowPath.offsetHeight; /* trigger reflow */
+    arrowPath.offsetHeight;
     arrowPath.style.animation = '';
 
-    // Fade tooltip card back in
     tooltip.classList.add('visible');
   }
 
   function handleResize() {
     if (!overlay.classList.contains('visible')) return;
 
-    // Debounce window resizes to prevent janky animations
     clearTimeout(resizeTimeout);
     resizeTimeout = setTimeout(() => {
       const step = steps[currentStep];
@@ -508,15 +469,35 @@
       e.preventDefault();
       e.stopPropagation();
       nextBtn.click();
+    } else if (e.key === 'Escape') {
+      e.preventDefault();
+      e.stopPropagation();
+      endTutorial();
     }
   }
 
   window.addEventListener('keydown', handleKeyDown);
 
-  // Mark onboarding completed and ensure overlay is hidden by default without triggering creator note
-  endTutorial(false);
+  // Auto-launch on first visit
+  async function initTutorial() {
+    let completed = false;
+    if (window.store) {
+      completed = await window.store.get('onboardingCompleted', false);
+    }
+    if (!completed) {
+      setTimeout(startTutorial, 500);
+    } else {
+      endTutorial(false);
+    }
+  }
 
-  // Make triggers global for debugging/testing
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initTutorial);
+  } else {
+    initTutorial();
+  }
+
+  // Make triggers global for debugging/testing/replaying
   window.startTutorial = startTutorial;
   window.endTutorial = endTutorial;
 })();
