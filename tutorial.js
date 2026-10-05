@@ -86,7 +86,7 @@
     },
     {
       title: "Main Control Toolbar",
-      text: "The vertical toolbar grants quick access to all your tools: pin goal photos, recenter your infinite canvas, adjust wallpapers, access bookmarks, manage tasks, lock the whiteboard, and toggle theme mode.",
+      text: "The vertical toolbar grants quick access to your core tools: pin goal photos, recenter your canvas, access bookmarks, lock the whiteboard, clear images, and toggle theme mode.",
       target: () => document.getElementById('verticalToolbar'),
       placement: "right",
       onBeforeShow: () => {

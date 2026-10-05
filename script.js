@@ -1470,6 +1470,9 @@ if (clearPhotosBtn) {
     const photos = await store.get('photos', []);
     if (photos.length === 0) return;
 
+    const confirmed = await ModalManager.confirm(`Remove all ${photos.length} photo${photos.length === 1 ? '' : 's'} from the board?`);
+    if (!confirmed) return;
+
     photoObjectUrls.forEach(url => URL.revokeObjectURL(url));
     photoObjectUrls.clear();
 
@@ -1935,14 +1938,8 @@ closeBookmarks.addEventListener('click', () => {
 });
 
 document.addEventListener('click', (e) => {
-  const todoDrawer = document.getElementById('todoDrawer');
-  const todoToggle = document.getElementById('todoToggle');
-
   if (bookmarksDrawer && !bookmarksDrawer.contains(e.target) && bookmarksToggle && !bookmarksToggle.contains(e.target)) {
     bookmarksDrawer.classList.remove('open');
-  }
-  if (todoDrawer && !todoDrawer.contains(e.target) && todoToggle && !todoToggle.contains(e.target)) {
-    todoDrawer.classList.remove('open');
   }
 });
 
