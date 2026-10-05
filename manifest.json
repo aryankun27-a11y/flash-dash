@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "Flash Dash",
   "version": "1.0",
-  "description": "Beautiful new tab with a big clock, goal photos, tasks, and bookmarks. Everything you need, nothing you don't.",
+  "description": "Beautiful new tab with a clock, goal photos, tasks, and bookmarks. Everything you need, nothing you don't.",
   "chrome_url_overrides": {
     "newtab": "newtab.html"
   },
@@ -10,15 +10,8 @@
     "storage",
     "unlimitedStorage",
     "bookmarks",
-    "search",
     "topSites"
   ],
-  "host_permissions": [
-    "https://suggestqueries.google.com/*"
-  ],
-  "background": {
-    "service_worker": "background.js"
-  },
   "icons": {
     "16": "icons/icon16.png",
     "48": "icons/icon48.png",

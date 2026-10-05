@@ -166,7 +166,7 @@
   ];
 
   function closeAllDrawers() {
-    const drawers = ['bookmarksDrawer', 'bgSettingsDrawer', 'todoDrawer'];
+    const drawers = ['bookmarksDrawer', 'todoDrawer'];
     drawers.forEach(id => {
       const el = document.getElementById(id);
       if (el) el.classList.remove('open');

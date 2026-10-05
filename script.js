@@ -353,10 +353,7 @@ async function toggleFocusMode(e) {
       e.target.closest('.right-panel') ||
       e.target.closest('.vertical-toolbar') ||
       e.target.closest('.slide-drawer') ||
-      e.target.closest('#bgSettingsDrawer') ||
       e.target.closest('.top-right-dock') ||
-      e.target.closest('#clockTodoWidget') ||
-      e.target.closest('.search-wrapper') ||
       e.target.closest('#timerTime')) return;
   }
 
@@ -374,13 +371,7 @@ async function toggleFocusMode(e) {
 }
 
 async function applyDimnessState() {
-  const baseDim = parseInt(await store.get('bgDim', 0));
-  const extraDim = (timerState === 'running') ? 15 : 0;
-  const finalDim = Math.min(100, baseDim + extraDim);
-  const screenBgOverlay = document.getElementById('screenBgOverlay');
-  if (screenBgOverlay) {
-    screenBgOverlay.style.opacity = finalDim / 100;
-  }
+  // Screen background dimness feature removed
 }
 
 function playPremiumChime() {
@@ -737,10 +728,9 @@ document.addEventListener('keydown', (e) => {
 
     let drawerClosed = false;
     const bookmarksDrawer = document.getElementById('bookmarksDrawer');
-    const bgSettingsDrawer = document.getElementById('bgSettingsDrawer');
     const todoDrawer = document.getElementById('todoDrawer');
 
-    [bookmarksDrawer, bgSettingsDrawer, todoDrawer].forEach(drawer => {
+    [bookmarksDrawer, todoDrawer].forEach(drawer => {
       if (drawer && drawer.classList.contains('open')) {
         drawer.classList.remove('open');
         drawerClosed = true;
@@ -1480,9 +1470,6 @@ if (clearPhotosBtn) {
     const photos = await store.get('photos', []);
     if (photos.length === 0) return;
 
-    const confirmed = await ModalManager.confirm(`Remove all ${photos.length} photo${photos.length === 1 ? '' : 's'} from the board?`);
-    if (!confirmed) return;
-
     photoObjectUrls.forEach(url => URL.revokeObjectURL(url));
     photoObjectUrls.clear();
 
@@ -1662,8 +1649,6 @@ photoInput.addEventListener('change', async (e) => {
 let dragCounter = 0;
 document.addEventListener('dragenter', (e) => {
   e.preventDefault();
-  const bgSettingsDrawer = document.getElementById('bgSettingsDrawer');
-  if (bgSettingsDrawer && bgSettingsDrawer.classList.contains('open')) return;
   dragCounter++;
   if (e.dataTransfer.types.includes('Files')) {
     document.getElementById('dragOverlay').classList.add('active');
@@ -1676,8 +1661,6 @@ document.addEventListener('dragover', (e) => {
 
 document.addEventListener('dragleave', (e) => {
   e.preventDefault();
-  const bgSettingsDrawer = document.getElementById('bgSettingsDrawer');
-  if (bgSettingsDrawer && bgSettingsDrawer.classList.contains('open')) return;
   dragCounter--;
   if (dragCounter === 0) {
     document.getElementById('dragOverlay').classList.remove('active');
@@ -1686,8 +1669,6 @@ document.addEventListener('dragleave', (e) => {
 
 document.addEventListener('drop', async (e) => {
   e.preventDefault();
-  const bgSettingsDrawer = document.getElementById('bgSettingsDrawer');
-  if (bgSettingsDrawer && bgSettingsDrawer.classList.contains('open')) return;
   dragCounter = 0;
   document.getElementById('dragOverlay').classList.remove('active');
 
@@ -1940,9 +1921,7 @@ const bookmarkSearchInput = document.getElementById('bookmarkSearchInput');
 let cachedBookmarks = [];
 
 bookmarksToggle.addEventListener('click', () => {
-  const bgSettingsDrawer = document.getElementById('bgSettingsDrawer');
   const todoDrawer = document.getElementById('todoDrawer');
-  if (bgSettingsDrawer) bgSettingsDrawer.classList.remove('open');
   if (todoDrawer) todoDrawer.classList.remove('open');
   bookmarksDrawer.classList.toggle('open');
   if (bookmarksDrawer.classList.contains('open')) {
@@ -1956,16 +1935,11 @@ closeBookmarks.addEventListener('click', () => {
 });
 
 document.addEventListener('click', (e) => {
-  const bgSettingsDrawer = document.getElementById('bgSettingsDrawer');
-  const bgSettingsToggleBtn = document.getElementById('bgSettingsToggleBtn');
   const todoDrawer = document.getElementById('todoDrawer');
   const todoToggle = document.getElementById('todoToggle');
 
   if (bookmarksDrawer && !bookmarksDrawer.contains(e.target) && bookmarksToggle && !bookmarksToggle.contains(e.target)) {
     bookmarksDrawer.classList.remove('open');
-  }
-  if (bgSettingsDrawer && !bgSettingsDrawer.contains(e.target) && bgSettingsToggleBtn && !bgSettingsToggleBtn.contains(e.target)) {
-    bgSettingsDrawer.classList.remove('open');
   }
   if (todoDrawer && !todoDrawer.contains(e.target) && todoToggle && !todoToggle.contains(e.target)) {
     todoDrawer.classList.remove('open');
@@ -2087,9 +2061,7 @@ let todos = [];
 
 if (todoToggle) {
   todoToggle.addEventListener('click', () => {
-    const bgSettingsDrawer = document.getElementById('bgSettingsDrawer');
     const bookmarksDrawer = document.getElementById('bookmarksDrawer');
-    if (bgSettingsDrawer) bgSettingsDrawer.classList.remove('open');
     if (bookmarksDrawer) bookmarksDrawer.classList.remove('open');
 
     todoDrawer.classList.toggle('open');
@@ -2331,83 +2303,6 @@ function renderTodos() {
 
     todoListEl.appendChild(li);
   });
-
-  renderClockWidgetTodos();
-}
-
-function renderClockWidgetTodos() {
-  const clockTodoList = document.getElementById('clockTodoList');
-  if (!clockTodoList) return;
-
-  clockTodoList.innerHTML = '';
-
-  const pendingTodos = todos.filter(t => !t.completed);
-
-  if (pendingTodos.length === 0) {
-    const empty = document.createElement('li');
-    empty.className = 'clock-todo-empty';
-    empty.textContent = 'All caught up!';
-    clockTodoList.appendChild(empty);
-  } else {
-    const MAX_VISIBLE = 4;
-    const visible = pendingTodos.slice(0, MAX_VISIBLE);
-
-    visible.forEach(todo => {
-      const li = document.createElement('li');
-      li.className = 'clock-todo-item';
-
-      const checkbox = document.createElement('div');
-      checkbox.className = 'clock-todo-checkbox';
-      checkbox.title = 'Complete task';
-      checkbox.addEventListener('click', async (e) => {
-        e.stopPropagation();
-        todo.completed = true;
-        await saveTodos();
-        renderTodos();
-      });
-
-      const text = document.createElement('span');
-      text.className = 'clock-todo-text';
-      text.textContent = todo.text;
-      text.title = todo.text;
-
-      const dot = document.createElement('span');
-      dot.className = `clock-todo-dot priority-${todo.priority || 'medium'}`;
-      dot.title = `${todo.priority || 'medium'} priority`;
-
-      li.appendChild(checkbox);
-      li.appendChild(text);
-      li.appendChild(dot);
-
-      clockTodoList.appendChild(li);
-    });
-  }
-
-  const overflow = pendingTodos.length - 4;
-  const moreBtn = document.getElementById('clockTodoOpenDrawerBtn');
-  if (moreBtn) {
-    if (overflow > 0) {
-      moreBtn.textContent = `+${overflow} more`;
-    } else {
-      moreBtn.textContent = 'View All';
-    }
-  }
-}
-
-const clockTodoOpenDrawerBtn = document.getElementById('clockTodoOpenDrawerBtn');
-if (clockTodoOpenDrawerBtn) {
-  clockTodoOpenDrawerBtn.addEventListener('click', () => {
-    const todoDrawer = document.getElementById('todoDrawer');
-    const bgSettingsDrawer = document.getElementById('bgSettingsDrawer');
-    const bookmarksDrawer = document.getElementById('bookmarksDrawer');
-    if (bgSettingsDrawer) bgSettingsDrawer.classList.remove('open');
-    if (bookmarksDrawer) bookmarksDrawer.classList.remove('open');
-    if (todoDrawer) {
-      todoDrawer.classList.add('open');
-      const todoInput = document.getElementById('todoInput');
-      if (todoInput) todoInput.focus();
-    }
-  });
 }
 
 async function handleAddTodo() {
@@ -2526,10 +2421,6 @@ lockBoardBtn.addEventListener('click', async () => {
   await store.set('boardLocked', next);
 });
 
-async function initBackground() {
-  // Background image feature removed
-}
-
 async function migrateLegacyData() {
   const photos = await store.get('photos', []);
   let needsSave = false;
@@ -2597,7 +2488,6 @@ function initMagneticToolbarButtons() {
 async function startupInit() {
   try { await migrateLegacyData(); } catch (e) { console.error("startupInit migrateLegacyData:", e); }
   try { await initCanvasTransform(); } catch (e) { console.error("startupInit initCanvasTransform:", e); }
-  try { await initBackground(); } catch (e) { console.error("startupInit initBackground:", e); }
   try { await initTheme(); } catch (e) { console.error("startupInit initTheme:", e); }
   try { await initClock(); } catch (e) { console.error("startupInit initClock:", e); }
 
@@ -2668,283 +2558,9 @@ function tickClock() {
   if (dateEl) dateEl.textContent = dateStr;
 }
 
-function initSearch() {
-  const searchInput = document.getElementById('searchInput');
-  const suggestionsContainer = document.getElementById('suggestionsContainer');
-  const searchWrapper = document.getElementById('searchWrapper');
-
-  if (!searchInput || !suggestionsContainer) return;
-
-  let debounceTimer = null;
-  let suggestions = [];
-  let selectedIndex = -1;
-
-  function executeSearch(query) {
-    if (!query) return;
-    if (window.chrome && chrome.search && chrome.search.query) {
-      chrome.search.query({
-        text: query,
-        disposition: 'CURRENT_TAB'
-      }, () => {
-        if (chrome.runtime.lastError) {
-          console.error("Chrome search API error:", chrome.runtime.lastError);
-          window.location.href = `https://www.google.com/search?q=${encodeURIComponent(query)}`;
-        }
-      });
-    } else {
-      window.location.href = `https://www.google.com/search?q=${encodeURIComponent(query)}`;
-    }
-  }
-
-  function fallbackMockTopSites() {
-    suggestions = [
-      { title: "Google", url: "https://google.com", type: "topsite" },
-      { title: "YouTube", url: "https://youtube.com", type: "topsite" },
-      { title: "GitHub", url: "https://github.com", type: "bookmark" },
-      { title: "Gmail", url: "https://mail.google.com", type: "topsite" },
-      { title: "ChatGPT", url: "https://chatgpt.com", type: "topsite" }
-    ];
-    renderSuggestions();
-  }
-
-  async function fetchSuggestions(query) {
-    if (!query) {
-      if (window.chrome && chrome.topSites && chrome.topSites.get) {
-        chrome.topSites.get((topSites) => {
-          suggestions = (topSites || []).slice(0, 6).map(t => ({
-            title: t.title || t.url,
-            url: t.url,
-            type: 'topsite'
-          }));
-          renderSuggestions();
-        });
-      } else {
-        fallbackMockTopSites();
-      }
-      return;
-    }
-
-    const getBookmarks = () => {
-      return new Promise((resolve) => {
-        if (window.chrome && chrome.bookmarks && chrome.bookmarks.search) {
-          chrome.bookmarks.search(query, (bookmarks) => {
-            resolve((bookmarks || [])
-              .filter(b => b.url)
-              .map(b => ({
-                title: b.title || b.url,
-                url: b.url,
-                type: 'bookmark'
-              }))
-            );
-          });
-        } else {
-          resolve([]);
-        }
-      });
-    };
-
-    const getTopSites = () => {
-      return new Promise((resolve) => {
-        if (window.chrome && chrome.topSites && chrome.topSites.get) {
-          chrome.topSites.get((topSites) => {
-            resolve((topSites || [])
-              .map(t => ({
-                title: t.title || t.url,
-                url: t.url,
-                type: 'topsite'
-              }))
-              .filter(t => {
-                const q = query.toLowerCase();
-                return t.title.toLowerCase().includes(q) || t.url.toLowerCase().includes(q);
-              })
-            );
-          });
-        } else {
-          resolve([]);
-        }
-      });
-    };
-
-    const getGoogleSuggestions = () => {
-      return new Promise((resolve) => {
-        if (window.chrome && chrome.runtime && chrome.runtime.sendMessage) {
-          chrome.runtime.sendMessage({ action: 'fetchSuggestions', query }, (response) => {
-            if (response && response.success && response.data && Array.isArray(response.data[1])) {
-              resolve(response.data[1].map(text => ({
-                title: text,
-                url: `https://www.google.com/search?q=${encodeURIComponent(text)}`,
-                type: 'search'
-              })));
-            } else {
-              resolve([]);
-            }
-          });
-        } else {
-          resolve([]);
-        }
-      });
-    };
-
-    Promise.all([getBookmarks(), getTopSites(), getGoogleSuggestions()]).then(([bookmarks, topSites, googleQueries]) => {
-      if (searchInput.value.trim() !== query) return;
-
-      let combined = [...bookmarks, ...topSites, ...googleQueries];
-      let seen = new Set();
-      suggestions = combined.filter(item => {
-        const key = item.type === 'search' ? `search:${item.title.toLowerCase()}` : item.url.replace(/\/$/, "").toLowerCase();
-        if (seen.has(key)) return false;
-        seen.add(key);
-        return true;
-      }).slice(0, 6);
-
-      renderSuggestions();
-    });
-  }
-
-  function renderSuggestions() {
-    suggestionsContainer.innerHTML = '';
-    if (suggestions.length === 0) {
-      hideSuggestions();
-      return;
-    }
-
-    suggestions.forEach((item, index) => {
-      const div = document.createElement('div');
-      div.className = 'suggestion-item';
-      if (index === selectedIndex) {
-        div.classList.add('selected');
-      }
-
-      let host = "";
-      let iconHtml = "";
-      let tagText = "";
-
-      if (item.type === 'search') {
-        host = "Google Search";
-        tagText = "";
-        iconHtml = `
-          <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="color: var(--text-dim);">
-            <circle cx="11" cy="11" r="8"></circle>
-            <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
-          </svg>
-        `;
-      } else {
-        try {
-          host = new URL(item.url).hostname;
-        } catch (e) {
-          host = item.url;
-        }
-        tagText = item.type === 'bookmark' ? '★' : '↗';
-        const faviconUrl = `https://www.google.com/s2/favicons?sz=32&domain_url=${encodeURIComponent(item.url)}`;
-        iconHtml = `<img src="${faviconUrl}" onerror="this.style.display='none';" />`;
-      }
-
-      div.innerHTML = `
-        <span class="suggestion-icon">
-          ${iconHtml}
-        </span>
-        <span class="suggestion-text-container">
-          <span class="suggestion-title">${escapeHtml(item.title)}</span>
-          <span class="suggestion-url">${escapeHtml(host)}</span>
-        </span>
-        <span class="suggestion-tag">${escapeHtml(tagText)}</span>
-      `;
-
-      div.addEventListener('click', () => {
-        window.location.href = item.url;
-        hideSuggestions();
-      });
-
-      suggestionsContainer.appendChild(div);
-    });
-
-    suggestionsContainer.classList.add('visible');
-  }
-
-  function hideSuggestions() {
-    suggestionsContainer.classList.remove('visible');
-    suggestions = [];
-    selectedIndex = -1;
-  }
-
-  function escapeHtml(str) {
-    return str
-      .replace(/&/g, "&amp;")
-      .replace(/</g, "&lt;")
-      .replace(/>/g, "&gt;")
-      .replace(/"/g, "&quot;")
-      .replace(/'/g, "&#039;");
-  }
-
-  searchInput.addEventListener('input', () => {
-    const val = searchInput.value.trim();
-    selectedIndex = -1;
-    clearTimeout(debounceTimer);
-    debounceTimer = setTimeout(() => {
-      fetchSuggestions(val);
-    }, 150);
-  });
-
-  searchInput.addEventListener('focus', () => {
-    document.body.classList.add('search-focused');
-    const val = searchInput.value.trim();
-    fetchSuggestions(val);
-  });
-
-  searchInput.addEventListener('blur', () => {
-    document.body.classList.remove('search-focused');
-    setTimeout(() => {
-      if (document.activeElement !== searchInput) {
-        hideSuggestions();
-      }
-    }, 200);
-  });
-
-  searchInput.addEventListener('keydown', (e) => {
-    if (e.key === 'ArrowDown') {
-      e.preventDefault();
-      if (suggestions.length > 0) {
-        selectedIndex = (selectedIndex + 1) % suggestions.length;
-        renderSuggestions();
-        searchInput.value = suggestions[selectedIndex].title;
-      }
-    } else if (e.key === 'ArrowUp') {
-      e.preventDefault();
-      if (suggestions.length > 0) {
-        selectedIndex = (selectedIndex - 1 + suggestions.length) % suggestions.length;
-        renderSuggestions();
-        searchInput.value = suggestions[selectedIndex].title;
-      }
-    } else if (e.key === 'Escape') {
-      e.preventDefault();
-      hideSuggestions();
-      searchInput.blur();
-    } else if (e.key === 'Enter') {
-      e.preventDefault();
-      if (selectedIndex >= 0 && selectedIndex < suggestions.length) {
-        window.location.href = suggestions[selectedIndex].url;
-      } else {
-        const finalQuery = searchInput.value.trim();
-        executeSearch(finalQuery);
-      }
-      hideSuggestions();
-    }
-  });
-
-  const searchOverlay = document.getElementById('searchOverlay');
-  if (searchOverlay) {
-    searchOverlay.addEventListener('mousedown', (e) => {
-      e.preventDefault();
-      hideSuggestions();
-      searchInput.blur();
-    });
-  }
-}
-
 if (document.getElementById('clockHours')) {
   tickClock();
   setInterval(tickClock, 1000);
 }
 
-initSearch();
 startupInit();
