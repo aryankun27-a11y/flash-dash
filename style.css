@@ -965,13 +965,115 @@ body.focus-mode .stage {
   border-color: var(--text-dim);
 }
 
-/* ---------- Tasks Drawer Layout ---------- */
+/* ---------- Collapsible Tasks Card (In Top-Right Dock) ---------- */
+.dock-tasks-card {
+  width: 100%;
+  background: var(--glass);
+  border: 1px solid var(--border);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border-radius: 16px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.18);
+  overflow: hidden;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease;
+}
+
+.dock-tasks-card:hover {
+  border-color: rgba(255, 255, 255, 0.12);
+}
+
+[data-theme="light"] .dock-tasks-card:hover {
+  border-color: rgba(0, 0, 0, 0.12);
+}
+
+.dock-tasks-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 11px 14px;
+  cursor: pointer;
+  user-select: none;
+  -webkit-user-select: none;
+  transition: background 0.15s ease;
+}
+
+.dock-tasks-header:hover {
+  background: var(--glass-strong);
+}
+
+.dock-tasks-title-group {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+  letter-spacing: -0.2px;
+}
+
+.dock-tasks-icon {
+  color: var(--text-dim);
+  transition: color 0.15s ease;
+}
+
+.dock-tasks-header:hover .dock-tasks-icon {
+  color: var(--text);
+}
+
+.dock-tasks-badge {
+  font-size: 10px;
+  font-weight: 700;
+  padding: 2px 7px;
+  border-radius: 10px;
+  background: rgba(239, 68, 68, 0.18);
+  color: #ef4444;
+  letter-spacing: 0.2px;
+  transition: all 0.2s ease;
+}
+
+.dock-tasks-badge.zero {
+  background: rgba(74, 222, 128, 0.16);
+  color: #4ade80;
+}
+
+.dock-tasks-chevron {
+  color: var(--text-dim);
+  transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1), color 0.15s ease;
+}
+
+.dock-tasks-header:hover .dock-tasks-chevron {
+  color: var(--text);
+}
+
+.dock-tasks-card.collapsed .dock-tasks-chevron {
+  transform: rotate(-90deg);
+}
+
+.dock-tasks-collapse {
+  max-height: 52vh;
+  opacity: 1;
+  overflow-y: auto;
+  transition: max-height 0.32s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.22s ease, padding 0.22s ease;
+  padding: 4px 14px 14px;
+  scrollbar-width: thin;
+  scrollbar-color: var(--border) transparent;
+}
+
+.dock-tasks-card.collapsed .dock-tasks-collapse {
+  max-height: 0;
+  opacity: 0;
+  padding-top: 0;
+  padding-bottom: 0;
+  overflow: hidden;
+}
+
+/* ---------- Tasks Card Form & List Layout ---------- */
 .todo-add-container {
   display: flex;
   flex-direction: column;
   gap: 8px;
-  margin-bottom: 16px;
-  padding-bottom: 12px;
+  margin-bottom: 12px;
+  padding-bottom: 10px;
   border-bottom: 1px solid var(--border);
 }
 
@@ -1363,12 +1465,12 @@ body.focus-mode .stage {
 .top-right-dock {
   position: fixed;
   top: 24px;
-  right: 32px;
-  width: auto;
+  right: 28px;
+  width: 280px;
   z-index: 100;
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 10px;
   pointer-events: none;
   transition: opacity 0.3s ease, transform 0.3s ease;
 }

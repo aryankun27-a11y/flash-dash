@@ -108,42 +108,55 @@
     </ul>
   </div>
 
-  <!-- slide-out tasks drawer (slides from left next to toolbar) -->
-  <div class="slide-drawer" id="todoDrawer">
-    <div class="drawer-header">
-      <span class="drawer-title">Tasks</span>
-      <button id="closeTodo" class="drawer-close">&times;</button>
-    </div>
-    <div class="todo-add-container">
-      <div class="todo-input-row">
-        <input type="text" id="todoInput" placeholder="Add a new task..." autocomplete="off" spellcheck="false" />
-        <button id="addTodoBtn" class="todo-add-btn">Add</button>
-      </div>
-      <div class="todo-add-options">
-        <select id="todoPriority" title="Priority">
-          <option value="low">Low Priority</option>
-          <option value="medium" selected>Medium Priority</option>
-          <option value="high">High Priority</option>
-        </select>
-      </div>
-    </div>
-    <ul class="todo-list" id="todoList">
-      <!-- Dynamically populated tasks -->
-    </ul>
-    <div class="todo-footer">
-      <span id="todoCount">0 tasks left</span>
-      <button id="clearCompletedTodo" class="clear-tasks-btn">Clear Completed</button>
-    </div>
-  </div>
-
-  <!-- Minimal Top-Right Clock & Date Widget -->
+  <!-- Top-Right Unified Dock: Clock & Tasks -->
   <div class="top-right-dock" id="topRightDock">
+    <!-- Minimal Clock & Date Widget -->
     <div class="clock-widget" id="clockView" title="Click to toggle 12h / 24h format">
       <div class="clock-time">
         <span id="clockHours">00</span><span class="clock-colon">:</span><span id="clockMinutes">00</span>
         <span class="clock-ampm" id="ampm">AM</span>
       </div>
       <div class="clock-date" id="date">Loading…</div>
+    </div>
+
+    <!-- Collapsible Tasks Card -->
+    <div class="dock-tasks-card" id="dockTasksCard">
+      <div class="dock-tasks-header" id="dockTasksHeader" title="Click to collapse / expand tasks">
+        <div class="dock-tasks-title-group">
+          <svg class="dock-tasks-icon" viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M9 11l3 3L22 4" />
+            <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11" />
+          </svg>
+          <span class="dock-tasks-title">Tasks</span>
+          <span class="dock-tasks-badge" id="dockTasksBadge">0</span>
+        </div>
+        <svg class="dock-tasks-chevron" id="dockTasksChevron" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2">
+          <polyline points="6 9 12 15 18 9" />
+        </svg>
+      </div>
+
+      <div class="dock-tasks-collapse" id="dockTasksCollapse">
+        <div class="todo-add-container">
+          <div class="todo-input-row">
+            <input type="text" id="todoInput" placeholder="Add a new task..." autocomplete="off" spellcheck="false" />
+            <button id="addTodoBtn" class="todo-add-btn">Add</button>
+          </div>
+          <div class="todo-add-options">
+            <select id="todoPriority" title="Priority">
+              <option value="low">Low Priority</option>
+              <option value="medium" selected>Medium Priority</option>
+              <option value="high">High Priority</option>
+            </select>
+          </div>
+        </div>
+        <ul class="todo-list" id="todoList">
+          <!-- Dynamically populated tasks -->
+        </ul>
+        <div class="todo-footer">
+          <span id="todoCount">0 tasks left</span>
+          <button id="clearCompletedTodo" class="clear-tasks-btn">Clear Completed</button>
+        </div>
+      </div>
     </div>
   </div>
 

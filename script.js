@@ -2047,8 +2047,9 @@ function renderBookmarksList(bookmarks) {
 // ==========================================
 
 const todoToggle = document.getElementById('todoToggle');
-const todoDrawer = document.getElementById('todoDrawer');
-const closeTodo = document.getElementById('closeTodo');
+const dockTasksCard = document.getElementById('dockTasksCard');
+const dockTasksHeader = document.getElementById('dockTasksHeader');
+const dockTasksBadge = document.getElementById('dockTasksBadge');
 const todoInput = document.getElementById('todoInput');
 const todoPriority = document.getElementById('todoPriority');
 const addTodoBtn = document.getElementById('addTodoBtn');
@@ -2059,21 +2060,29 @@ const clearCompletedTodoBtn = document.getElementById('clearCompletedTodo');
 
 let todos = [];
 
-if (todoToggle) {
-  todoToggle.addEventListener('click', () => {
-    const bookmarksDrawer = document.getElementById('bookmarksDrawer');
-    if (bookmarksDrawer) bookmarksDrawer.classList.remove('open');
-
-    todoDrawer.classList.toggle('open');
-    if (todoDrawer.classList.contains('open')) {
-      todoInput.focus();
-    }
+if (dockTasksHeader && dockTasksCard) {
+  dockTasksHeader.addEventListener('click', async () => {
+    dockTasksCard.classList.toggle('collapsed');
+    const isCollapsed = dockTasksCard.classList.contains('collapsed');
+    await store.set('tasksCollapsed', isCollapsed);
   });
 }
 
-if (closeTodo) {
-  closeTodo.addEventListener('click', () => {
-    todoDrawer.classList.remove('open');
+if (todoToggle) {
+  todoToggle.addEventListener('click', async () => {
+    const bookmarksDrawer = document.getElementById('bookmarksDrawer');
+    if (bookmarksDrawer) bookmarksDrawer.classList.remove('open');
+
+    if (dockTasksCard) {
+      if (dockTasksCard.classList.contains('collapsed')) {
+        dockTasksCard.classList.remove('collapsed');
+        await store.set('tasksCollapsed', false);
+        if (todoInput) todoInput.focus();
+      } else {
+        dockTasksCard.classList.add('collapsed');
+        await store.set('tasksCollapsed', true);
+      }
+    }
   });
 }
 
@@ -2155,6 +2164,10 @@ function makeWidgetDraggable(widgetEl, storageKeyPrefix) {
 
 async function initTodos() {
   todos = await store.get('todos', []);
+  const isCollapsed = await store.get('tasksCollapsed', false);
+  if (dockTasksCard && isCollapsed) {
+    dockTasksCard.classList.add('collapsed');
+  }
   renderTodos();
 }
 
@@ -2176,6 +2189,19 @@ function renderTodos() {
       todoBadge.classList.remove('hidden');
     } else {
       todoBadge.classList.add('hidden');
+    }
+  }
+
+  if (dockTasksBadge) {
+    if (activeCount === 0 && todos.length > 0) {
+      dockTasksBadge.classList.add('zero');
+      dockTasksBadge.textContent = '✓ Done';
+    } else if (activeCount === 0 && todos.length === 0) {
+      dockTasksBadge.classList.remove('zero');
+      dockTasksBadge.textContent = '0';
+    } else {
+      dockTasksBadge.classList.remove('zero');
+      dockTasksBadge.textContent = `${activeCount}`;
     }
   }
 

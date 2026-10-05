@@ -120,14 +120,14 @@
       }
     },
     {
-      title: "Interactive Tasks Drawer",
-      text: "Keep track of daily goals with priority tags (Low, Medium, High), animated checkmark completions, drag-and-drop task reordering, and live task counter badges.",
+      title: "Interactive Tasks",
+      text: "Keep track of daily goals with priority tags (Low, Medium, High), animated checkmark completions, drag-and-drop task reordering, and live task counter badges right below your clock.",
       target: () => {
-        const d = document.getElementById('todoDrawer');
-        if (d) d.classList.add('open');
+        const d = document.getElementById('dockTasksCard');
+        if (d) d.classList.remove('collapsed');
         return d;
       },
-      placement: "right",
+      placement: "left",
       transitionDelay: 350,
       onBeforeShow: () => {
         closeAllDrawers();
