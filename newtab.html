@@ -1,10 +1,38 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" class="no-transitions">
 
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>New Tab</title>
+  <script>
+    /* Immediate synchronous pre-hydration to eliminate theme flash & FOUC */
+    (function () {
+      try {
+        const theme = localStorage.getItem('theme');
+        if (theme === 'light') {
+          document.documentElement.setAttribute('data-theme', 'light');
+        } else if (theme === 'dark') {
+          document.documentElement.setAttribute('data-theme', 'dark');
+        }
+
+        const is24 = localStorage.getItem('clock24HourFormat') === 'true';
+        const now = new Date();
+        const rawH = now.getHours();
+        const m = now.getMinutes().toString().padStart(2, '0');
+        let h = rawH;
+        let ampm = '';
+        if (!is24) {
+          ampm = h >= 12 ? 'PM' : 'AM';
+          h = h % 12;
+          if (h === 0) h = 12;
+        }
+        const hStr = is24 ? rawH.toString().padStart(2, '0') : h.toString().padStart(2, '0');
+        const dateStr = now.toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' });
+        window.__fdPreInit = { h: hStr, m, ampm, date: dateStr, is24 };
+      } catch (e) { }
+    })();
+  </script>
   <link rel="stylesheet" href="style.css" />
 </head>
 
@@ -310,6 +338,83 @@
       </div>
     </div>
   </div>
+
+  <!-- Immediate Synchronous DOM Pre-hydration Script -->
+  <script>
+    (function () {
+      try {
+        // Hydrate clock time and full date immediately before browser paint
+        if (window.__fdPreInit) {
+          const hoursEl = document.getElementById('clockHours');
+          const minutesEl = document.getElementById('clockMinutes');
+          const ampmEl = document.getElementById('ampm');
+          const dateEl = document.getElementById('date');
+          if (hoursEl) hoursEl.textContent = window.__fdPreInit.h;
+          if (minutesEl) minutesEl.textContent = window.__fdPreInit.m;
+          if (ampmEl) {
+            ampmEl.textContent = window.__fdPreInit.ampm;
+            ampmEl.style.display = window.__fdPreInit.ampm ? 'inline' : 'none';
+          }
+          if (dateEl) dateEl.textContent = window.__fdPreInit.date;
+        }
+
+        // Pre-collapse tasks card if previously collapsed to prevent accordion slide-shut jump
+        if (localStorage.getItem('tasksCollapsed') === 'true') {
+          const card = document.getElementById('dockTasksCard');
+          if (card) card.classList.add('collapsed');
+        }
+
+        // Pre-activate Focus Mode if previously active to prevent dock fade-out flash
+        if (localStorage.getItem('focusMode') === 'true') {
+          document.body.classList.add('focus-mode');
+        }
+
+        // Pre-apply canvas pan transform to prevent board snap on load
+        const panX = localStorage.getItem('boardPanX');
+        const panY = localStorage.getItem('boardPanY');
+        if (panX !== null && panY !== null) {
+          const canvas = document.getElementById('boardCanvas');
+          if (canvas) {
+            canvas.style.transform = `translate3d(${parseFloat(panX)}px, ${parseFloat(panY)}px, 0px)`;
+          }
+        }
+
+        // Pre-apply lock icon state
+        if (localStorage.getItem('boardLocked') === 'true') {
+          const board = document.getElementById('board');
+          const lockBtn = document.getElementById('lockBoardBtn');
+          const lockIcon = document.getElementById('lockIcon');
+          if (board) board.classList.add('board-locked');
+          if (lockBtn) lockBtn.classList.add('active');
+          if (lockIcon) lockIcon.innerHTML = '<rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>';
+        }
+
+        // Pre-hydrate tasks count badge to prevent "0" badge flicker
+        const rawTodos = localStorage.getItem('todos');
+        if (rawTodos) {
+          const parsed = JSON.parse(rawTodos);
+          if (Array.isArray(parsed)) {
+            const active = parsed.filter(t => !t.completed).length;
+            const badge = document.getElementById('dockTasksBadge');
+            const count = document.getElementById('todoCount');
+            if (badge) {
+              if (active === 0 && parsed.length > 0) {
+                badge.classList.add('zero');
+                badge.textContent = '✓ Done';
+              } else if (active === 0 && parsed.length === 0) {
+                badge.classList.remove('zero');
+                badge.textContent = '0';
+              } else {
+                badge.classList.remove('zero');
+                badge.textContent = active;
+              }
+            }
+            if (count) count.textContent = `${active} task${active === 1 ? '' : 's'} left`;
+          }
+        }
+      } catch (e) { }
+    })();
+  </script>
 
   <script src="script.js"></script>
   <script src="tutorial.js"></script>

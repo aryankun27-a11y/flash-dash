@@ -36,6 +36,10 @@
   color: var(--text);
 }
 
+html {
+  zoom: 0.9;
+}
+
 html,
 body {
   margin: 0;
@@ -54,8 +58,18 @@ body {
   overscroll-behavior: none !important;
 }
 
-body {
-  zoom: 0.9;
+/* Kill all CSS transitions and animations during initial new tab page load to eliminate glitches */
+html.no-transitions,
+html.no-transitions *,
+html.no-transitions *::before,
+html.no-transitions *::after {
+  -webkit-transition: none !important;
+  -moz-transition: none !important;
+  -ms-transition: none !important;
+  -o-transition: none !important;
+  transition: none !important;
+  animation-duration: 0s !important;
+  animation-delay: 0s !important;
 }
 
 input,

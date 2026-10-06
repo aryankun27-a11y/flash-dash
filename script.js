@@ -15,8 +15,65 @@ const storageQueue = new StorageQueue();
 
 const chromeStore = (window.chrome && chrome.storage && chrome.storage.local) ? chrome.storage.local : null;
 
+// Synchronous fast cache to eliminate async IPC waterfalls on tab creation
+const storeCache = new Map();
+
+// Prime storeCache from localStorage immediately
+try {
+  for (let i = 0; i < localStorage.length; i++) {
+    const k = localStorage.key(i);
+    const raw = localStorage.getItem(k);
+    try {
+      storeCache.set(k, JSON.parse(raw));
+    } catch (e) {
+      if (raw === 'true') storeCache.set(k, true);
+      else if (raw === 'false') storeCache.set(k, false);
+      else if (!isNaN(Number(raw)) && raw.trim() !== '') storeCache.set(k, Number(raw));
+      else storeCache.set(k, raw);
+    }
+  }
+} catch (e) { }
+
+function syncKeyToLocalStorage(key, value) {
+  try {
+    if (typeof value === 'string' || typeof value === 'boolean' || typeof value === 'number') {
+      localStorage.setItem(key, String(value));
+    } else if (value === null || value === undefined) {
+      localStorage.removeItem(key);
+    } else {
+      localStorage.setItem(key, JSON.stringify(value));
+    }
+  } catch (e) { }
+}
+
 const store = {
+  // Batch preload all extension settings in ONE single IPC call
+  async batchPreload() {
+    if (chromeStore) {
+      return new Promise(res => {
+        try {
+          chromeStore.get(null, items => {
+            if (items && typeof items === 'object') {
+              for (const [k, v] of Object.entries(items)) {
+                storeCache.set(k, v);
+                syncKeyToLocalStorage(k, v);
+              }
+            }
+            res();
+          });
+        } catch (e) {
+          res();
+        }
+      });
+    }
+    return Promise.resolve();
+  },
+
   async get(key, fallback) {
+    if (storeCache.has(key)) {
+      const cached = storeCache.get(key);
+      return cached !== undefined ? cached : fallback;
+    }
     if (chromeStore) {
       return new Promise(res => {
         try {
@@ -24,7 +81,10 @@ const store = {
             if (chrome.runtime && chrome.runtime.lastError) {
               res(fallback);
             } else {
-              res((r && r[key] !== undefined) ? r[key] : fallback);
+              const val = (r && r[key] !== undefined) ? r[key] : fallback;
+              storeCache.set(key, val);
+              syncKeyToLocalStorage(key, val);
+              res(val);
             }
           });
         } catch (e) {
@@ -34,10 +94,23 @@ const store = {
     }
     try {
       const v = localStorage.getItem(key);
-      return v ? JSON.parse(v) : fallback;
+      if (v === null) return fallback;
+      try {
+        const parsed = JSON.parse(v);
+        storeCache.set(key, parsed);
+        return parsed;
+      } catch (e) {
+        if (v === 'true') return true;
+        if (v === 'false') return false;
+        return v;
+      }
     } catch (e) { return fallback; }
   },
+
   async set(key, value) {
+    storeCache.set(key, value);
+    syncKeyToLocalStorage(key, value);
+
     if (chromeStore) {
       return new Promise(res => {
         try {
@@ -45,13 +118,14 @@ const store = {
         } catch (e) { res(); }
       });
     }
-    try {
-      localStorage.setItem(key, JSON.stringify(value));
-    } catch (e) {
-      console.error(`Flash Dash Storage Error: Failed to set key "${key}" in localStorage:`, e);
-    }
   },
+
   async setMultiple(obj) {
+    for (const [k, v] of Object.entries(obj)) {
+      storeCache.set(k, v);
+      syncKeyToLocalStorage(k, v);
+    }
+
     if (chromeStore) {
       return new Promise(res => {
         try {
@@ -59,14 +133,8 @@ const store = {
         } catch (e) { res(); }
       });
     }
-    try {
-      for (const [k, v] of Object.entries(obj)) {
-        localStorage.setItem(k, JSON.stringify(v));
-      }
-    } catch (e) {
-      console.error('Flash Dash Storage Error: Failed to set multiple keys in localStorage:', e);
-    }
   },
+
   async mutate(key, fallback, mutatorFn) {
     return storageQueue.enqueue(async () => {
       const current = await this.get(key, fallback);
@@ -1432,15 +1500,20 @@ async function renderBoard() {
   });
 
   const activeIds = new Set();
+  const toRender = [];
   for (const photo of loadedPhotos) {
     activeIds.add(photo.id);
     const el = existingEls.get(photo.id);
     if (!el) {
-      await renderPhotoEl(photo);
+      toRender.push(photo);
     } else {
       updatePhotoPositionStyle(el, photo);
       el.style.zIndex = photo.z || 2;
     }
+  }
+
+  if (toRender.length > 0) {
+    await Promise.all(toRender.map(p => renderPhotoEl(p)));
   }
 
   existingEls.forEach((el, id) => {
@@ -2306,6 +2379,9 @@ lockBoardBtn.addEventListener('click', async () => {
 });
 
 async function migrateLegacyData() {
+  const isMigrated = await store.get('legacyMigrationDone', false);
+  if (isMigrated) return;
+
   const photos = await store.get('photos', []);
   let needsSave = false;
 
@@ -2349,6 +2425,7 @@ async function migrateLegacyData() {
   if (needsSave) {
     await store.set('photos', photos);
   }
+  await store.set('legacyMigrationDone', true);
 }
 
 function initMagneticToolbarButtons() {
@@ -2635,30 +2712,63 @@ if (shortcutPickerPopover) {
 }
 
 async function startupInit() {
-  try { await migrateLegacyData(); } catch (e) { console.error("startupInit migrateLegacyData:", e); }
-  try { await initCanvasTransform(); } catch (e) { console.error("startupInit initCanvasTransform:", e); }
-  try { await initTheme(); } catch (e) { console.error("startupInit initTheme:", e); }
-  try { await initClock(); } catch (e) { console.error("startupInit initClock:", e); }
+  // Step 1: Preload all extension storage in ONE single parallel IPC call
+  try {
+    await store.batchPreload();
+  } catch (e) {
+    console.error("startupInit batchPreload:", e);
+  }
+
+  // Step 2: Initialize UI states in parallel (fulfilled immediately from storeCache)
+  try {
+    await Promise.all([
+      initCanvasTransform(),
+      initTheme(),
+      initClock(),
+      initLockState(),
+      initTodos(),
+      initShortcuts(),
+      (typeof initFocusMode === 'function' ? initFocusMode() : Promise.resolve())
+    ]);
+  } catch (e) {
+    console.error("startupInit parallel init:", e);
+  }
 
   try {
-    if (typeof initFocusMode === 'function') {
-      await initFocusMode();
-    }
-  } catch (e) { console.error("startupInit initFocusMode:", e); }
+    initMagneticToolbarButtons();
+  } catch (e) {
+    console.error("startupInit initMagneticToolbarButtons:", e);
+  }
 
-  try { await initLockState(); } catch (e) { console.error("startupInit initLockState:", e); }
-  try { await initTodos(); } catch (e) { console.error("startupInit initTodos:", e); }
-  try { await initShortcuts(); } catch (e) { console.error("startupInit initShortcuts:", e); }
-  try { initMagneticToolbarButtons(); } catch (e) { console.error("startupInit initMagneticToolbarButtons:", e); }
-
+  // Step 3: Render whiteboard photos in parallel
   try {
     if (typeof renderBoard === 'function') {
       await renderBoard();
     }
-  } catch (e) { console.error("startupInit renderBoard:", e); }
+  } catch (e) {
+    console.error("startupInit renderBoard:", e);
+  }
+
+  // Step 4: Re-enable buttery-smooth CSS transitions once initial layout has stabilized
+  requestAnimationFrame(() => {
+    requestAnimationFrame(() => {
+      document.documentElement.classList.remove('no-transitions');
+      document.body.classList.remove('no-transitions');
+    });
+  });
+
+  // Step 5: Lazy background migration (deferred so it never blocks UI painting)
+  setTimeout(async () => {
+    try {
+      await migrateLegacyData();
+    } catch (e) {
+      console.error("startupInit lazy migrateLegacyData:", e);
+    }
+  }, 1000);
 }
 
 let is24HourClock = false;
+let clockInterval = null;
 
 async function initClock() {
   const clockView = document.getElementById('clockView');
@@ -2673,6 +2783,9 @@ async function initClock() {
     }
   });
   tickClock();
+  if (!clockInterval) {
+    clockInterval = setInterval(tickClock, 1000);
+  }
 }
 
 function tickClock() {
@@ -2706,11 +2819,6 @@ function tickClock() {
   const dateStr = now.toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' });
   const dateEl = document.getElementById('date');
   if (dateEl) dateEl.textContent = dateStr;
-}
-
-if (document.getElementById('clockHours')) {
-  tickClock();
-  setInterval(tickClock, 1000);
 }
 
 startupInit();

@@ -485,9 +485,7 @@
       completed = await window.store.get('onboardingCompleted', false);
     }
     if (!completed) {
-      setTimeout(startTutorial, 500);
-    } else {
-      endTutorial(false);
+      setTimeout(startTutorial, 600);
     }
   }
 
